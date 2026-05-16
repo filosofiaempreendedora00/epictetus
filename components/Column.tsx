@@ -12,6 +12,7 @@ type Props = {
   isFirst?: boolean;
   onAddCard: () => void;
   onDeleteCard: (cardId: string) => void;
+  onUpdateValue?: (cardId: string, field: "pontual" | "recurring", value: number) => void;
 };
 
 export default function Column({
@@ -21,6 +22,7 @@ export default function Column({
   isFirst,
   onAddCard,
   onDeleteCard,
+  onUpdateValue,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -84,6 +86,7 @@ export default function Column({
               card={card}
               columnId={column.id}
               onDelete={() => onDeleteCard(card.id)}
+              onUpdateValue={onUpdateValue}
             />
           ))}
         </SortableContext>

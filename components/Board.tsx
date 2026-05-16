@@ -159,6 +159,37 @@ export default function Board() {
     alert("Exclusão pelo Kanban ficará disponível em breve. Mova ou exclua o negócio no Bitrix.");
   }
 
+  async function handleUpdateValue(
+    cardId: string,
+    field: "pontual" | "recurring",
+    value: number
+  ) {
+    const current = state.cards[cardId];
+    if (!current?.bitrixId) return;
+    const prev = current[field] ?? 0;
+    if (prev === value) return;
+
+    setState((s) => ({
+      ...s,
+      cards: { ...s.cards, [cardId]: { ...s.cards[cardId], [field]: value } },
+    }));
+
+    try {
+      const res = await fetch(`/api/bitrix/deals/${current.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || "falha");
+    } catch (e: any) {
+      setState((s) => ({
+        ...s,
+        cards: { ...s.cards, [cardId]: { ...s.cards[cardId], [field]: prev } },
+      }));
+      alert(`Erro ao salvar valor no Bitrix: ${e?.message || ""}`);
+    }
+  }
+
   function columnTotal(colCardIds: string[]) {
     return colCardIds.reduce((sum, id) => {
       const c = state.cards[id];
@@ -202,6 +233,7 @@ export default function Board() {
             isFirst={idx === 0}
             onAddCard={() => handleAddCard(col.id)}
             onDeleteCard={handleDeleteCard}
+            onUpdateValue={handleUpdateValue}
           />
         ))}
       </div>
