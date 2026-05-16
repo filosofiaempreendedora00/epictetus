@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { TasksBoardState, TaskCard } from "@/lib/types";
+import TaskEditModal from "./TaskEditModal";
 
 const EMPTY: TasksBoardState = { tasks: {} };
 
@@ -47,6 +48,44 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateView, setDateView] = useState<DateView>("weekly");
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+
+  const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
+
+  async function handleSaveTask(fields: {
+    title: string;
+    description: string;
+    deadline: string | null;
+  }) {
+    if (!editingTask) return;
+    const prev = editingTask;
+    setState((s) => ({
+      ...s,
+      tasks: {
+        ...s.tasks,
+        [prev.id]: {
+          ...s.tasks[prev.id],
+          title: fields.title,
+          description: fields.description,
+          deadline: fields.deadline,
+        },
+      },
+    }));
+    try {
+      const res = await fetch(`/api/bitrix/tasks/${prev.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao salvar no Bitrix");
+      }
+    } catch (e: any) {
+      setState((s) => ({ ...s, tasks: { ...s.tasks, [prev.id]: prev } }));
+      throw e;
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -116,11 +155,27 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     <div className="px-6 pb-6">
       <DateViewSwitcher value={dateView} onChange={setDateView} />
       {dateView === "monthly" ? (
-        <MonthlyView tasksByDay={tasksByDay} />
+        <MonthlyView
+          tasksByDay={tasksByDay}
+          onTaskClick={setEditingTaskId}
+        />
       ) : (
         <DayColumnsView
           tasksByDay={tasksByDay}
           days={dateView === "weekly" ? 7 : 14}
+          onTaskClick={setEditingTaskId}
+        />
+      )}
+
+      {editingTask && (
+        <TaskEditModal
+          heading="Editar tarefa"
+          initialTitle={editingTask.title}
+          initialDescription={editingTask.description}
+          initialDeadline={editingTask.deadline}
+          saveLabel="Salvar"
+          onClose={() => setEditingTaskId(null)}
+          onSave={handleSaveTask}
         />
       )}
     </div>
@@ -161,9 +216,11 @@ function DateViewSwitcher({
 function DayColumnsView({
   tasksByDay,
   days,
+  onTaskClick,
 }: {
   tasksByDay: Map<string, TaskCard[]>;
   days: number;
+  onTaskClick: (taskId: string) => void;
 }) {
   const now = new Date();
   const start = startOfWeekSunday(now);
@@ -216,7 +273,11 @@ function DayColumnsView({
                 </div>
               )}
               {tasks.map((t) => (
-                <TaskMiniCard key={t.id} task={t} />
+                <TaskMiniCard
+                  key={t.id}
+                  task={t}
+                  onClick={() => onTaskClick(t.id)}
+                />
               ))}
             </div>
           );
@@ -228,8 +289,10 @@ function DayColumnsView({
 
 function MonthlyView({
   tasksByDay,
+  onTaskClick,
 }: {
   tasksByDay: Map<string, TaskCard[]>;
+  onTaskClick: (taskId: string) => void;
 }) {
   const now = new Date();
   const year = now.getFullYear();
@@ -291,7 +354,11 @@ function MonthlyView({
               </div>
               <div className="space-y-1">
                 {tasks.slice(0, 3).map((t) => (
-                  <MonthlyTaskItem key={t.id} task={t} />
+                  <MonthlyTaskItem
+                    key={t.id}
+                    task={t}
+                    onClick={() => onTaskClick(t.id)}
+                  />
                 ))}
                 {tasks.length > 3 && (
                   <div className="text-[9px] text-white/40">
@@ -307,17 +374,21 @@ function MonthlyView({
   );
 }
 
-function TaskMiniCard({ task }: { task: TaskCard }) {
-  const time = task.deadline
-    ? new Date(task.deadline)
-    : null;
-  const hhmm = time
-    ? `${pad2(time.getHours())}:${pad2(time.getMinutes())}`
-    : "";
+function TaskMiniCard({
+  task,
+  onClick,
+}: {
+  task: TaskCard;
+  onClick: () => void;
+}) {
+  const time = task.deadline ? new Date(task.deadline) : null;
+  const hhmm = time ? `${pad2(time.getHours())}:${pad2(time.getMinutes())}` : "";
   return (
-    <div
-      className="bg-white rounded-md shadow-sm px-2 py-1.5 cursor-default"
-      title={task.title}
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left bg-white rounded-md shadow-sm px-2 py-1.5 hover:shadow-md hover:bg-slate-50 transition cursor-pointer"
+      title={`${task.title} — clique para editar`}
     >
       {task.dealName && (
         <div className="text-[9px] text-sky-600 truncate leading-snug">
@@ -327,20 +398,26 @@ function TaskMiniCard({ task }: { task: TaskCard }) {
       <div className="text-slate-900 text-[11px] font-medium leading-snug break-words">
         {task.title}
       </div>
-      {hhmm && (
-        <div className="text-[9px] text-slate-400 mt-0.5">{hhmm}</div>
-      )}
-    </div>
+      {hhmm && <div className="text-[9px] text-slate-400 mt-0.5">{hhmm}</div>}
+    </button>
   );
 }
 
-function MonthlyTaskItem({ task }: { task: TaskCard }) {
+function MonthlyTaskItem({
+  task,
+  onClick,
+}: {
+  task: TaskCard;
+  onClick: () => void;
+}) {
   return (
-    <div
-      className="bg-sky-50 border border-sky-100 text-sky-800 rounded px-1.5 py-0.5 text-[10px] truncate"
-      title={task.title}
+    <button
+      type="button"
+      onClick={onClick}
+      className="block w-full text-left bg-sky-50 border border-sky-100 text-sky-800 hover:bg-sky-100 transition rounded px-1.5 py-0.5 text-[10px] truncate cursor-pointer"
+      title={`${task.title} — clique para editar`}
     >
       {task.title}
-    </div>
+    </button>
   );
 }

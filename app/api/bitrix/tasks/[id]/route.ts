@@ -13,10 +13,18 @@ export async function PATCH(
 
     if (typeof body.title === "string") fields.TITLE = body.title.trim();
     if (typeof body.description === "string") fields.DESCRIPTION = body.description;
+    if (body.deadline !== undefined) {
+      // string (ISO) → seta; null/"" → limpa o prazo
+      fields.DEADLINE = body.deadline || "";
+    }
 
-    if (!fields.TITLE && fields.DESCRIPTION === undefined) {
+    if (
+      fields.TITLE === undefined &&
+      fields.DESCRIPTION === undefined &&
+      fields.DEADLINE === undefined
+    ) {
       return NextResponse.json(
-        { error: "Passe title ou description" },
+        { error: "Passe title, description ou deadline" },
         { status: 400 }
       );
     }

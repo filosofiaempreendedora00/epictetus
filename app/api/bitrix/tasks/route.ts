@@ -94,6 +94,7 @@ export async function POST(req: Request) {
     const title: string = (body.title || "").trim();
     const description: string = body.description || "";
     const dealId: string = String(body.dealId || "").trim();
+    const deadline: string | null = body.deadline || null;
 
     if (!title) {
       return NextResponse.json(
@@ -116,23 +117,27 @@ export async function POST(req: Request) {
       );
     }
 
+    const taskFields: Record<string, any> = {
+      TITLE: title,
+      DESCRIPTION: description,
+      RESPONSIBLE_ID: responsibleId,
+      CREATED_BY: responsibleId,
+      UF_CRM_TASK: [`D_${dealId}`],
+    };
+    if (deadline) taskFields.DEADLINE = deadline;
+
     const result = await bitrix<{ task: any }>("tasks.task.add", {
-      fields: {
-        TITLE: title,
-        DESCRIPTION: description,
-        RESPONSIBLE_ID: responsibleId,
-        CREATED_BY: responsibleId,
-        UF_CRM_TASK: [`D_${dealId}`],
-      },
+      fields: taskFields,
     });
 
     const t = result?.task || {};
+    const finalDeadline = t.deadline ?? deadline ?? null;
     const newTask: DealTask = {
       id: String(t.id ?? ""),
       title: t.title ?? title,
       description: t.description ?? description,
-      deadline: t.deadline ?? null,
-      overdue: false,
+      deadline: finalDeadline,
+      overdue: finalDeadline ? new Date(finalDeadline).getTime() < Date.now() : false,
     };
 
     return NextResponse.json(newTask);

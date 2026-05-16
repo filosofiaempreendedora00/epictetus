@@ -13,8 +13,8 @@ type Props = {
   onAddCard: () => void;
   onDeleteCard: (cardId: string) => void;
   onUpdateValue?: (cardId: string, field: "pontual" | "recurring", value: number) => void;
-  onUpdateTask?: (cardId: string, taskId: string, fields: { title?: string; description?: string }) => Promise<void>;
-  onCreateTask?: (cardId: string, fields: { title: string; description: string }) => Promise<void>;
+  onUpdateTask?: (cardId: string, taskId: string, fields: { title?: string; description?: string; deadline?: string | null }) => Promise<void>;
+  onCreateTask?: (cardId: string, fields: { title: string; description: string; deadline?: string | null }) => Promise<void>;
 };
 
 export default function Column({

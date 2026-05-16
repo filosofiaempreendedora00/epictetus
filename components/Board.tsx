@@ -165,7 +165,7 @@ export default function Board() {
 
   async function handleCreateTask(
     cardId: string,
-    fields: { title: string; description: string }
+    fields: { title: string; description: string; deadline?: string | null }
   ) {
     const card = state.cards[cardId];
     if (!card?.bitrixId) {
@@ -198,7 +198,7 @@ export default function Board() {
   async function handleUpdateTask(
     cardId: string,
     taskId: string,
-    fields: { title?: string; description?: string }
+    fields: { title?: string; description?: string; deadline?: string | null }
   ) {
     const card = state.cards[cardId];
     const taskIdx = card?.tasks?.findIndex((t) => t.id === taskId) ?? -1;
@@ -209,10 +209,15 @@ export default function Board() {
 
     setState((s) => {
       const tasks = [...(s.cards[cardId].tasks || [])];
+      const now = Date.now();
+      const newDeadline =
+        fields.deadline !== undefined ? fields.deadline : tasks[taskIdx].deadline;
       tasks[taskIdx] = {
         ...tasks[taskIdx],
         ...(fields.title !== undefined && { title: fields.title }),
         ...(fields.description !== undefined && { description: fields.description }),
+        ...(fields.deadline !== undefined && { deadline: fields.deadline }),
+        overdue: newDeadline ? new Date(newDeadline).getTime() < now : false,
       };
       return {
         ...s,
