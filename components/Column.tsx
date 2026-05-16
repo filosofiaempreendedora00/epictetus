@@ -39,9 +39,9 @@ export default function Column({
       <div
         className={`bg-gradient-to-r ${column.color} rounded-t-2xl px-4 py-3 flex items-center justify-between shadow-md`}
       >
-        <div className="flex items-center gap-2 text-white font-medium text-sm">
-          <span>{column.title}</span>
-          <span className="text-white/80">{cards.length}</span>
+        <div className="flex items-center gap-1.5 text-white font-medium text-[13px] min-w-0">
+          <span className="whitespace-nowrap truncate">{column.title}</span>
+          <span className="text-white/80 shrink-0">{cards.length}</span>
         </div>
         <button
           className="text-white/80 hover:text-white w-6 h-6 rounded-full hover:bg-white/15 transition flex items-center justify-center"
