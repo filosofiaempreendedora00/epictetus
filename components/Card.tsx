@@ -239,23 +239,25 @@ export default function Card({ card, columnId, onDelete, onUpdateValue }: Props)
       {/* Tarefas */}
       <div className="mt-2 pt-1.5 border-t border-slate-100">
         {card.tasks && card.tasks.length > 0 ? (
-          <ul className="space-y-0.5">
+          <ul className="space-y-1">
             {card.tasks.map((task) => (
               <li
                 key={task.id}
-                className="flex items-baseline gap-1.5 text-[11px]"
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] ${
+                  task.overdue
+                    ? "bg-red-50 border-red-100"
+                    : "bg-sky-50 border-sky-100"
+                }`}
                 title={task.title}
               >
                 <span
-                  className={`leading-none shrink-0 ${
-                    task.overdue ? "text-red-500" : "text-slate-400"
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    task.overdue ? "bg-red-500" : "bg-sky-500"
                   }`}
-                >
-                  •
-                </span>
+                />
                 <span
-                  className={`flex-1 truncate ${
-                    task.overdue ? "text-red-600 font-medium" : "text-slate-700"
+                  className={`flex-1 truncate font-medium ${
+                    task.overdue ? "text-red-700" : "text-sky-800"
                   }`}
                 >
                   {task.title}
@@ -263,7 +265,7 @@ export default function Card({ card, columnId, onDelete, onUpdateValue }: Props)
                 {task.deadline && (
                   <span
                     className={`shrink-0 text-[10px] whitespace-nowrap ${
-                      task.overdue ? "text-red-500" : "text-slate-400"
+                      task.overdue ? "text-red-500" : "text-sky-600"
                     }`}
                   >
                     {formatTaskDeadline(task.deadline)}
@@ -273,7 +275,10 @@ export default function Card({ card, columnId, onDelete, onUpdateValue }: Props)
             ))}
           </ul>
         ) : (
-          <div className="text-slate-400 text-[11px]">+ Criar tarefa</div>
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-slate-200 text-slate-400 text-[11px]">
+            <span className="leading-none">+</span>
+            <span>Criar tarefa</span>
+          </div>
         )}
       </div>
     </div>
