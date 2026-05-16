@@ -57,7 +57,7 @@ function MoneyRow({
   if (editing) {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide w-[42px] shrink-0">
+        <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide whitespace-nowrap shrink-0">
           Valor {label}
         </span>
         <input
@@ -86,11 +86,11 @@ function MoneyRow({
 
   return (
     <div className="flex items-baseline gap-1.5 group/v">
-      <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide w-[42px] shrink-0">
+      <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide whitespace-nowrap shrink-0">
         Valor {label}
       </span>
       <span
-        className={`text-[12px] ${
+        className={`text-[12px] whitespace-nowrap ${
           isZero ? "text-slate-600" : "text-slate-900 font-semibold"
         }`}
       >
