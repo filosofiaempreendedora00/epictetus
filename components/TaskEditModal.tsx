@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   heading: string;
@@ -71,6 +71,137 @@ function localInputToBitrix(local: string): string | null {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(
     d.getHours()
   )}:${pad2(d.getMinutes())}:00${sign}${hh}:${mm}`;
+}
+
+function HourPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        className="w-[60px] text-sm text-slate-900 border border-slate-200 rounded-lg px-2 py-2 outline-none hover:border-slate-300 focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 disabled:text-slate-400 flex items-center justify-between gap-1"
+        aria-label="Hora"
+      >
+        <span className="tabular-nums">{pad2(value)}</span>
+        <span className="text-slate-400 text-[10px]">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-10 top-full mt-1 left-0 bg-white rounded-lg shadow-xl border border-slate-200 p-1.5 grid grid-cols-4 gap-1 min-w-[176px]">
+          {Array.from({ length: 24 }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                onChange(i);
+                setOpen(false);
+              }}
+              className={`tabular-nums text-[13px] px-2 py-1.5 rounded transition ${
+                i === value
+                  ? "bg-sky-500 text-white font-medium"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              {pad2(i)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MinutePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const safeValue = [0, 15, 30, 45].includes(value) ? value : 0;
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        className="w-[60px] text-sm text-slate-900 border border-slate-200 rounded-lg px-2 py-2 outline-none hover:border-slate-300 focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 disabled:text-slate-400 flex items-center justify-between gap-1"
+        aria-label="Minuto"
+      >
+        <span className="tabular-nums">{pad2(safeValue)}</span>
+        <span className="text-slate-400 text-[10px]">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-10 top-full mt-1 left-0 bg-white rounded-lg shadow-xl border border-slate-200 p-1.5 flex gap-1">
+          {[0, 15, 30, 45].map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                onChange(m);
+                setOpen(false);
+              }}
+              className={`tabular-nums text-[13px] px-3 py-1.5 rounded transition ${
+                m === safeValue
+                  ? "bg-sky-500 text-white font-medium"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              {pad2(m)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function TaskEditModal({
@@ -176,37 +307,17 @@ export default function TaskEditModal({
                 disabled={saving}
                 className="flex-1 text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
               />
-              <select
+              <HourPicker
                 value={dlHour}
-                onChange={(e) =>
-                  setDeadline(joinLocal(dlDate, parseInt(e.target.value, 10), dlMinute))
-                }
+                onChange={(h) => setDeadline(joinLocal(dlDate, h, dlMinute))}
                 disabled={saving || !dlDate}
-                className="text-sm text-slate-900 border border-slate-200 rounded-lg px-2 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 disabled:text-slate-400"
-                aria-label="Hora"
-              >
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={i}>
-                    {pad2(i)}
-                  </option>
-                ))}
-              </select>
+              />
               <span className="text-slate-400">:</span>
-              <select
-                value={[0, 15, 30, 45].includes(dlMinute) ? dlMinute : 0}
-                onChange={(e) =>
-                  setDeadline(joinLocal(dlDate, dlHour, parseInt(e.target.value, 10)))
-                }
+              <MinutePicker
+                value={dlMinute}
+                onChange={(m) => setDeadline(joinLocal(dlDate, dlHour, m))}
                 disabled={saving || !dlDate}
-                className="text-sm text-slate-900 border border-slate-200 rounded-lg px-2 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 disabled:text-slate-400"
-                aria-label="Minuto"
-              >
-                {[0, 15, 30, 45].map((m) => (
-                  <option key={m} value={m}>
-                    {pad2(m)}
-                  </option>
-                ))}
-              </select>
+              />
               {dlDate && (
                 <button
                   type="button"
