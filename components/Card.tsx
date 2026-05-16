@@ -16,6 +16,10 @@ type Props = {
     taskId: string,
     fields: { title?: string; description?: string }
   ) => Promise<void>;
+  onCreateTask?: (
+    cardId: string,
+    fields: { title: string; description: string }
+  ) => Promise<void>;
 };
 
 function pad2(n: number) {
@@ -142,16 +146,22 @@ function MoneyRow({
 }
 
 function TaskEditModal({
-  task,
+  heading,
+  initialTitle,
+  initialDescription,
+  saveLabel,
   onClose,
   onSave,
 }: {
-  task: DealTask;
+  heading: string;
+  initialTitle: string;
+  initialDescription: string;
+  saveLabel: string;
   onClose: () => void;
   onSave: (fields: { title: string; description: string }) => Promise<void>;
 }) {
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description || "");
+  const [title, setTitle] = useState(initialTitle);
+  const [description, setDescription] = useState(initialDescription);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -194,7 +204,7 @@ function TaskEditModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">Editar tarefa</h2>
+          <h2 className="text-base font-semibold text-slate-900">{heading}</h2>
           <button
             onClick={onClose}
             disabled={saving}
@@ -255,7 +265,7 @@ function TaskEditModal({
             disabled={saving}
             className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
           >
-            {saving ? "Salvando…" : "Salvar"}
+            {saving ? "Salvando…" : saveLabel}
           </button>
         </div>
       </div>
@@ -263,7 +273,14 @@ function TaskEditModal({
   );
 }
 
-export default function Card({ card, columnId, onDelete, onUpdateValue, onUpdateTask }: Props) {
+export default function Card({
+  card,
+  columnId,
+  onDelete,
+  onUpdateValue,
+  onUpdateTask,
+  onCreateTask,
+}: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
       id: card.id,
@@ -271,7 +288,9 @@ export default function Card({ card, columnId, onDelete, onUpdateValue, onUpdate
     });
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [creatingTask, setCreatingTask] = useState(false);
   const editingTask = card.tasks?.find((t) => t.id === editingTaskId) || null;
+  const showModal = !!editingTask || creatingTask;
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -367,8 +386,8 @@ export default function Card({ card, columnId, onDelete, onUpdateValue, onUpdate
         )}
 
         {/* Tarefas */}
-        <div className="mt-2 pt-1.5 border-t border-slate-100">
-          {card.tasks && card.tasks.length > 0 ? (
+        <div className="mt-2 pt-1.5 border-t border-slate-100 space-y-1">
+          {card.tasks && card.tasks.length > 0 && (
             <ul className="space-y-1">
               {card.tasks.map((task) => (
                 <li
@@ -410,20 +429,44 @@ export default function Card({ card, columnId, onDelete, onUpdateValue, onUpdate
                 </li>
               ))}
             </ul>
-          ) : (
-            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-slate-200 text-slate-400 text-[11px]">
+          )}
+
+          {onCreateTask && (
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCreatingTask(true);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-slate-200 text-slate-400 hover:text-sky-600 hover:border-sky-300 transition text-[11px]"
+              title="Criar nova tarefa"
+            >
               <span className="leading-none">+</span>
               <span>Criar tarefa</span>
-            </div>
+            </button>
           )}
         </div>
       </div>
 
-      {editingTask && onUpdateTask && (
+      {showModal && (
         <TaskEditModal
-          task={editingTask}
-          onClose={() => setEditingTaskId(null)}
-          onSave={(fields) => onUpdateTask(card.id, editingTask.id, fields)}
+          heading={editingTask ? "Editar tarefa" : "Nova tarefa"}
+          initialTitle={editingTask?.title ?? ""}
+          initialDescription={editingTask?.description ?? ""}
+          saveLabel={editingTask ? "Salvar" : "Criar"}
+          onClose={() => {
+            setEditingTaskId(null);
+            setCreatingTask(false);
+          }}
+          onSave={async (fields) => {
+            if (editingTask && onUpdateTask) {
+              await onUpdateTask(card.id, editingTask.id, fields);
+            } else if (creatingTask && onCreateTask) {
+              await onCreateTask(card.id, fields);
+            }
+          }}
         />
       )}
     </>

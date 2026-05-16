@@ -161,6 +161,38 @@ export default function Board() {
     alert("Exclusão pelo Kanban ficará disponível em breve. Mova ou exclua o negócio no Bitrix.");
   }
 
+  async function handleCreateTask(
+    cardId: string,
+    fields: { title: string; description: string }
+  ) {
+    const card = state.cards[cardId];
+    if (!card?.bitrixId) {
+      throw new Error("Negócio sem ID do Bitrix");
+    }
+
+    const res = await fetch("/api/bitrix/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...fields, dealId: card.bitrixId }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.error || "Falha ao criar tarefa no Bitrix");
+    }
+    const newTask = (await res.json()) as import("@/lib/types").DealTask;
+
+    setState((s) => ({
+      ...s,
+      cards: {
+        ...s.cards,
+        [cardId]: {
+          ...s.cards[cardId],
+          tasks: [...(s.cards[cardId].tasks || []), newTask],
+        },
+      },
+    }));
+  }
+
   async function handleUpdateTask(
     cardId: string,
     taskId: string,
@@ -310,6 +342,7 @@ export default function Board() {
                 onDeleteCard={handleDeleteCard}
                 onUpdateValue={handleUpdateValue}
                 onUpdateTask={handleUpdateTask}
+                onCreateTask={handleCreateTask}
               />
             );
           })}

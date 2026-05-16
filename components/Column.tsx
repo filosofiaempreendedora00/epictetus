@@ -14,6 +14,7 @@ type Props = {
   onDeleteCard: (cardId: string) => void;
   onUpdateValue?: (cardId: string, field: "pontual" | "recurring", value: number) => void;
   onUpdateTask?: (cardId: string, taskId: string, fields: { title?: string; description?: string }) => Promise<void>;
+  onCreateTask?: (cardId: string, fields: { title: string; description: string }) => Promise<void>;
 };
 
 export default function Column({
@@ -25,6 +26,7 @@ export default function Column({
   onDeleteCard,
   onUpdateValue,
   onUpdateTask,
+  onCreateTask,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -90,6 +92,7 @@ export default function Column({
               onDelete={() => onDeleteCard(card.id)}
               onUpdateValue={onUpdateValue}
               onUpdateTask={onUpdateTask}
+              onCreateTask={onCreateTask}
             />
           ))}
         </SortableContext>
