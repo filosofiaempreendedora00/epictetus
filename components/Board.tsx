@@ -17,7 +17,8 @@ import type { BoardState, Card as CardType } from "@/lib/types";
 import { formatBRL } from "@/lib/initialData";
 import Column from "./Column";
 import Card from "./Card";
-import Header from "./Header";
+import Header, { type ViewMode } from "./Header";
+import TasksView from "./TasksView";
 
 const EMPTY_STATE: BoardState = { columns: [], cards: {} };
 
@@ -27,6 +28,7 @@ export default function Board() {
   const [error, setError] = useState<string | null>(null);
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("negocios");
 
   // Fetch board from Bitrix on mount
   useEffect(() => {
@@ -295,67 +297,63 @@ export default function Board() {
     });
   }
 
-  if (loading) {
-    return (
-      <>
-        <Header searchTerm={searchTerm} onSearchChange={setSearchTerm} />
+  return (
+    <>
+      <Header
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
+
+      {viewMode === "tarefas" ? (
+        <TasksView searchTerm={searchTerm} />
+      ) : loading ? (
         <div className="px-6 py-10 text-white/80 text-sm">
           Carregando negócios do Bitrix…
         </div>
-      </>
-    );
-  }
-
-  if (error) {
-    return (
-      <>
-        <Header searchTerm={searchTerm} onSearchChange={setSearchTerm} />
+      ) : error ? (
         <div className="mx-6 my-6 rounded-lg border border-red-400/40 bg-red-500/10 p-4 text-sm text-red-100">
           <div className="font-medium mb-1">Não consegui conectar ao Bitrix</div>
           <div className="opacity-80">{error}</div>
         </div>
-      </>
-    );
-  }
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto px-6 pb-6 col-scroll">
+            {state.columns.map((col, idx) => {
+              const visibleIds = filterCardIds(col.cardIds);
+              return (
+                <Column
+                  key={col.id}
+                  column={{ ...col, cardIds: visibleIds }}
+                  cards={visibleIds.map((id) => state.cards[id]).filter(Boolean)}
+                  totalLabel={formatBRL(columnTotal(visibleIds))}
+                  isFirst={idx === 0}
+                  onAddCard={() => handleAddCard(col.id)}
+                  onDeleteCard={handleDeleteCard}
+                  onUpdateValue={handleUpdateValue}
+                  onUpdateTask={handleUpdateTask}
+                  onCreateTask={handleCreateTask}
+                />
+              );
+            })}
+          </div>
 
-  return (
-    <>
-      <Header searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-4 overflow-x-auto px-6 pb-6 col-scroll">
-          {state.columns.map((col, idx) => {
-            const visibleIds = filterCardIds(col.cardIds);
-            return (
-              <Column
-                key={col.id}
-                column={{ ...col, cardIds: visibleIds }}
-                cards={visibleIds.map((id) => state.cards[id]).filter(Boolean)}
-                totalLabel={formatBRL(columnTotal(visibleIds))}
-                isFirst={idx === 0}
-                onAddCard={() => handleAddCard(col.id)}
-                onDeleteCard={handleDeleteCard}
-                onUpdateValue={handleUpdateValue}
-                onUpdateTask={handleUpdateTask}
-                onCreateTask={handleCreateTask}
-              />
-            );
-          })}
-        </div>
-
-        <DragOverlay>
-          {activeCard ? (
-            <div className="rotate-2">
-              <Card card={activeCard} columnId="overlay" />
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeCard ? (
+              <div className="rotate-2">
+                <Card card={activeCard} columnId="overlay" />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      )}
     </>
   );
 }
