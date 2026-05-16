@@ -530,8 +530,6 @@ function TaskMiniCard({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
   });
-  const time = task.deadline ? new Date(task.deadline) : null;
-  const hhmm = time ? `${pad2(time.getHours())}:${pad2(time.getMinutes())}` : "";
   return (
     <button
       ref={setNodeRef}
@@ -551,7 +549,6 @@ function TaskMiniCard({
       <div className="text-slate-900 text-[11px] font-medium leading-snug break-words">
         {task.title}
       </div>
-      {hhmm && <div className="text-[9px] text-slate-400 mt-0.5">{hhmm}</div>}
     </button>
   );
 }
