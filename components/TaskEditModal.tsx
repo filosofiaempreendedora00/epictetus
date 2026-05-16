@@ -47,6 +47,18 @@ function snapTo15Minutes(local: string): string {
   )}:${pad2(d.getMinutes())}`;
 }
 
+function splitLocal(local: string): { date: string; hour: number; minute: number } {
+  if (!local) return { date: "", hour: 9, minute: 0 };
+  const [date, time] = local.split("T");
+  const [h, m] = (time || "09:00").split(":").map((v) => parseInt(v, 10) || 0);
+  return { date: date || "", hour: h, minute: m };
+}
+
+function joinLocal(date: string, hour: number, minute: number): string {
+  if (!date) return "";
+  return `${date}T${pad2(hour)}:${pad2(minute)}`;
+}
+
 function localInputToBitrix(local: string): string | null {
   if (!local) return null;
   const d = new Date(local);
@@ -72,9 +84,13 @@ export default function TaskEditModal({
 }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
-  const [deadline, setDeadline] = useState(isoToLocalInput(initialDeadline));
+  const [deadline, setDeadline] = useState(() =>
+    snapTo15Minutes(isoToLocalInput(initialDeadline))
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { date: dlDate, hour: dlHour, minute: dlMinute } = splitLocal(deadline);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -152,19 +168,51 @@ export default function TaskEditModal({
             </label>
             <div className="flex items-center gap-2">
               <input
-                type="datetime-local"
-                value={deadline}
-                onChange={(e) => setDeadline(snapTo15Minutes(e.target.value))}
+                type="date"
+                value={dlDate}
+                onChange={(e) =>
+                  setDeadline(joinLocal(e.target.value, dlHour, dlMinute))
+                }
                 disabled={saving}
-                step={900}
                 className="flex-1 text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
               />
-              {deadline && (
+              <select
+                value={dlHour}
+                onChange={(e) =>
+                  setDeadline(joinLocal(dlDate, parseInt(e.target.value, 10), dlMinute))
+                }
+                disabled={saving || !dlDate}
+                className="text-sm text-slate-900 border border-slate-200 rounded-lg px-2 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 disabled:text-slate-400"
+                aria-label="Hora"
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>
+                    {pad2(i)}
+                  </option>
+                ))}
+              </select>
+              <span className="text-slate-400">:</span>
+              <select
+                value={[0, 15, 30, 45].includes(dlMinute) ? dlMinute : 0}
+                onChange={(e) =>
+                  setDeadline(joinLocal(dlDate, dlHour, parseInt(e.target.value, 10)))
+                }
+                disabled={saving || !dlDate}
+                className="text-sm text-slate-900 border border-slate-200 rounded-lg px-2 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 disabled:text-slate-400"
+                aria-label="Minuto"
+              >
+                {[0, 15, 30, 45].map((m) => (
+                  <option key={m} value={m}>
+                    {pad2(m)}
+                  </option>
+                ))}
+              </select>
+              {dlDate && (
                 <button
                   type="button"
                   onClick={() => setDeadline("")}
                   disabled={saving}
-                  className="text-[11px] text-slate-500 hover:text-red-600 transition px-2 py-1 rounded"
+                  className="text-[11px] text-slate-500 hover:text-red-600 transition px-2 py-1 rounded shrink-0"
                   title="Limpar prazo"
                 >
                   limpar
