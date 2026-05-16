@@ -258,7 +258,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           {draggedTask && (
             <div className="bg-white rounded-md shadow-xl px-2 py-1.5 rotate-2 cursor-grabbing min-w-[140px] max-w-[200px]">
               {draggedTask.dealName && (
-                <div className="text-[9px] text-sky-600 truncate leading-snug">
+                <div className="text-[9px] text-sky-600 leading-snug break-words">
                   {draggedTask.dealName}
                 </div>
               )}
@@ -544,7 +544,7 @@ function TaskMiniCard({
       title={`${task.title} — clique para editar, arraste para mudar o dia`}
     >
       {task.dealName && (
-        <div className="text-[9px] text-sky-600 truncate leading-snug">
+        <div className="text-[9px] text-sky-600 leading-snug break-words">
           {task.dealName}
         </div>
       )}
@@ -574,7 +574,7 @@ function MonthlyTaskItem({
       {...attributes}
       {...listeners}
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      className="block w-full text-left bg-sky-50 border border-sky-100 text-sky-800 hover:bg-sky-100 transition rounded px-1.5 py-0.5 text-[10px] truncate cursor-grab active:cursor-grabbing"
+      className="block w-full text-left bg-sky-50 border border-sky-100 text-sky-800 hover:bg-sky-100 transition rounded px-1.5 py-0.5 text-[10px] leading-snug break-words cursor-grab active:cursor-grabbing"
       title={`${task.title} — clique para editar, arraste para mudar o dia`}
     >
       {task.title}
