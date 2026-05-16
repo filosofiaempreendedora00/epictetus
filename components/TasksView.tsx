@@ -1,6 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import type { TasksBoardState, TaskCard } from "@/lib/types";
 import TaskEditModal from "./TaskEditModal";
 
@@ -43,14 +54,37 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
+function parseDayKey(key: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return null;
+  return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+}
+
+function dateToBitrixISO(d: Date): string {
+  const offset = -d.getTimezoneOffset();
+  const sign = offset >= 0 ? "+" : "-";
+  const absMin = Math.abs(offset);
+  const hh = pad2(Math.floor(absMin / 60));
+  const mm = pad2(absMin % 60);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(
+    d.getHours()
+  )}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}${sign}${hh}:${mm}`;
+}
+
 export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [state, setState] = useState<TasksBoardState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateView, setDateView] = useState<DateView>("weekly");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
   const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
+  const draggedTask = draggedTaskId ? state.tasks[draggedTaskId] : null;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   async function handleSaveTask(fields: {
     title: string;
@@ -87,6 +121,57 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     }
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    setDraggedTaskId(String(event.active.id));
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    setDraggedTaskId(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const taskId = String(active.id);
+    const targetKey = String(over.id);
+    const task = state.tasks[taskId];
+    if (!task?.deadline) return;
+
+    const currentDate = new Date(task.deadline);
+    if (isNaN(currentDate.getTime())) return;
+    if (dayKey(currentDate) === targetKey) return;
+
+    const targetDate = parseDayKey(targetKey);
+    if (!targetDate) return;
+
+    const newDate = new Date(targetDate);
+    newDate.setHours(
+      currentDate.getHours(),
+      currentDate.getMinutes(),
+      currentDate.getSeconds()
+    );
+    const newDeadlineIso = dateToBitrixISO(newDate);
+
+    const prev = task;
+    setState((s) => ({
+      ...s,
+      tasks: { ...s.tasks, [taskId]: { ...task, deadline: newDeadlineIso } },
+    }));
+
+    try {
+      const res = await fetch(`/api/bitrix/tasks/${task.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deadline: newDeadlineIso }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao salvar no Bitrix");
+      }
+    } catch (e: any) {
+      setState((s) => ({ ...s, tasks: { ...s.tasks, [taskId]: prev } }));
+      alert(`Erro ao mover tarefa: ${e?.message || ""}`);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -107,7 +192,6 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     };
   }, []);
 
-  // Agrupa tarefas por dia (chave YYYY-MM-DD do deadline)
   const tasksByDay = useMemo(() => {
     const m = new Map<string, TaskCard[]>();
     const q = searchTerm.trim().toLowerCase();
@@ -125,11 +209,8 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
       if (!m.has(key)) m.set(key, []);
       m.get(key)!.push(t);
     }
-    // ordena por horário do deadline dentro de cada dia
     for (const arr of m.values()) {
-      arr.sort((a, b) =>
-        (a.deadline || "").localeCompare(b.deadline || "")
-      );
+      arr.sort((a, b) => (a.deadline || "").localeCompare(b.deadline || ""));
     }
     return m;
   }, [state.tasks, searchTerm]);
@@ -154,18 +235,40 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   return (
     <div className="px-6 pb-6">
       <DateViewSwitcher value={dateView} onChange={setDateView} />
-      {dateView === "monthly" ? (
-        <MonthlyView
-          tasksByDay={tasksByDay}
-          onTaskClick={setEditingTaskId}
-        />
-      ) : (
-        <DayColumnsView
-          tasksByDay={tasksByDay}
-          days={dateView === "weekly" ? 7 : 14}
-          onTaskClick={setEditingTaskId}
-        />
-      )}
+
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        {dateView === "monthly" ? (
+          <MonthlyView
+            tasksByDay={tasksByDay}
+            onTaskClick={setEditingTaskId}
+          />
+        ) : (
+          <DayColumnsView
+            tasksByDay={tasksByDay}
+            days={dateView === "weekly" ? 7 : 14}
+            onTaskClick={setEditingTaskId}
+          />
+        )}
+
+        <DragOverlay>
+          {draggedTask && (
+            <div className="bg-white rounded-md shadow-xl px-2 py-1.5 rotate-2 cursor-grabbing min-w-[140px] max-w-[200px]">
+              {draggedTask.dealName && (
+                <div className="text-[9px] text-sky-600 truncate leading-snug">
+                  {draggedTask.dealName}
+                </div>
+              )}
+              <div className="text-slate-900 text-[11px] font-medium leading-snug break-words">
+                {draggedTask.title}
+              </div>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       {editingTask && (
         <TaskEditModal
@@ -256,33 +359,52 @@ function DayColumnsView({
 
       {/* Colunas com tarefas */}
       <div className="flex" style={{ minHeight: "calc(100vh - 280px)" }}>
-        {dayList.map((d) => {
-          const today = isSameDay(d, now);
-          const tasks = tasksByDay.get(dayKey(d)) || [];
-          return (
-            <div
-              key={dayKey(d)}
-              className={`flex-1 min-w-0 border-r border-white/5 p-1.5 space-y-1.5 col-scroll overflow-y-auto ${
-                today ? "bg-white/[0.03]" : ""
-              }`}
-              style={{ maxHeight: "calc(100vh - 280px)" }}
-            >
-              {tasks.length === 0 && (
-                <div className="text-center text-white/15 text-[10px] py-4 select-none">
-                  —
-                </div>
-              )}
-              {tasks.map((t) => (
-                <TaskMiniCard
-                  key={t.id}
-                  task={t}
-                  onClick={() => onTaskClick(t.id)}
-                />
-              ))}
-            </div>
-          );
-        })}
+        {dayList.map((d) => (
+          <DroppableDayColumn
+            key={dayKey(d)}
+            date={d}
+            isToday={isSameDay(d, now)}
+            tasks={tasksByDay.get(dayKey(d)) || []}
+            onTaskClick={onTaskClick}
+          />
+        ))}
       </div>
+    </div>
+  );
+}
+
+function DroppableDayColumn({
+  date,
+  isToday,
+  tasks,
+  onTaskClick,
+}: {
+  date: Date;
+  isToday: boolean;
+  tasks: TaskCard[];
+  onTaskClick: (taskId: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: dayKey(date) });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex-1 min-w-0 border-r border-white/5 p-1.5 space-y-1.5 col-scroll overflow-y-auto transition ${
+        isOver
+          ? "bg-sky-500/15 outline outline-1 outline-sky-400/50"
+          : isToday
+          ? "bg-white/[0.03]"
+          : ""
+      }`}
+      style={{ maxHeight: "calc(100vh - 280px)" }}
+    >
+      {tasks.length === 0 && (
+        <div className="text-center text-white/15 text-[10px] py-4 select-none">
+          —
+        </div>
+      )}
+      {tasks.map((t) => (
+        <TaskMiniCard key={t.id} task={t} onClick={() => onTaskClick(t.id)} />
+      ))}
     </div>
   );
 }
@@ -300,10 +422,7 @@ function MonthlyView({
   const firstOfMonth = new Date(year, month, 1);
   const lastOfMonth = new Date(year, month + 1, 0);
   const gridStart = startOfWeekSunday(firstOfMonth);
-  const gridEndExclusive = addDays(
-    startOfWeekSunday(lastOfMonth),
-    7
-  );
+  const gridEndExclusive = addDays(startOfWeekSunday(lastOfMonth), 7);
   const totalDays =
     (gridEndExclusive.getTime() - gridStart.getTime()) / (1000 * 60 * 60 * 24);
   const dayList = Array.from({ length: Math.round(totalDays) }, (_, i) =>
@@ -326,49 +445,76 @@ function MonthlyView({
         ))}
       </div>
       <div className="grid grid-cols-7 border-t border-white/10">
-        {dayList.map((d) => {
-          const inMonth = d.getMonth() === month;
-          const today = isSameDay(d, now);
-          const tasks = tasksByDay.get(dayKey(d)) || [];
-          return (
-            <div
-              key={dayKey(d)}
-              className={`min-h-[90px] border-r border-b border-white/5 p-1.5 last:border-r-0 ${
-                inMonth ? "" : "bg-black/20"
-              } ${today ? "bg-white/[0.04]" : ""}`}
-            >
-              <div className="flex items-center justify-end mb-1">
-                {today ? (
-                  <span className="bg-red-500 text-white text-[10px] font-semibold rounded-full w-5 h-5 inline-flex items-center justify-center">
-                    {d.getDate()}
-                  </span>
-                ) : (
-                  <span
-                    className={`text-[11px] ${
-                      inMonth ? "text-white/70" : "text-white/25"
-                    }`}
-                  >
-                    {d.getDate()}
-                  </span>
-                )}
-              </div>
-              <div className="space-y-1">
-                {tasks.slice(0, 3).map((t) => (
-                  <MonthlyTaskItem
-                    key={t.id}
-                    task={t}
-                    onClick={() => onTaskClick(t.id)}
-                  />
-                ))}
-                {tasks.length > 3 && (
-                  <div className="text-[9px] text-white/40">
-                    +{tasks.length - 3} mais
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {dayList.map((d) => (
+          <DroppableMonthCell
+            key={dayKey(d)}
+            date={d}
+            inMonth={d.getMonth() === month}
+            isToday={isSameDay(d, now)}
+            tasks={tasksByDay.get(dayKey(d)) || []}
+            onTaskClick={onTaskClick}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DroppableMonthCell({
+  date,
+  inMonth,
+  isToday,
+  tasks,
+  onTaskClick,
+}: {
+  date: Date;
+  inMonth: boolean;
+  isToday: boolean;
+  tasks: TaskCard[];
+  onTaskClick: (taskId: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: dayKey(date) });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`min-h-[90px] border-r border-b border-white/5 p-1.5 last:border-r-0 transition ${
+        isOver
+          ? "bg-sky-500/15 outline outline-1 outline-sky-400/50"
+          : !inMonth
+          ? "bg-black/20"
+          : isToday
+          ? "bg-white/[0.04]"
+          : ""
+      }`}
+    >
+      <div className="flex items-center justify-end mb-1">
+        {isToday ? (
+          <span className="bg-red-500 text-white text-[10px] font-semibold rounded-full w-5 h-5 inline-flex items-center justify-center">
+            {date.getDate()}
+          </span>
+        ) : (
+          <span
+            className={`text-[11px] ${
+              inMonth ? "text-white/70" : "text-white/25"
+            }`}
+          >
+            {date.getDate()}
+          </span>
+        )}
+      </div>
+      <div className="space-y-1">
+        {tasks.slice(0, 3).map((t) => (
+          <MonthlyTaskItem
+            key={t.id}
+            task={t}
+            onClick={() => onTaskClick(t.id)}
+          />
+        ))}
+        {tasks.length > 3 && (
+          <div className="text-[9px] text-white/40">
+            +{tasks.length - 3} mais
+          </div>
+        )}
       </div>
     </div>
   );
@@ -381,14 +527,21 @@ function TaskMiniCard({
   task: TaskCard;
   onClick: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+  });
   const time = task.deadline ? new Date(task.deadline) : null;
   const hhmm = time ? `${pad2(time.getHours())}:${pad2(time.getMinutes())}` : "";
   return (
     <button
+      ref={setNodeRef}
       type="button"
       onClick={onClick}
-      className="w-full text-left bg-white rounded-md shadow-sm px-2 py-1.5 hover:shadow-md hover:bg-slate-50 transition cursor-pointer"
-      title={`${task.title} — clique para editar`}
+      {...attributes}
+      {...listeners}
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+      className="w-full text-left bg-white rounded-md shadow-sm px-2 py-1.5 hover:shadow-md hover:bg-slate-50 transition cursor-grab active:cursor-grabbing"
+      title={`${task.title} — clique para editar, arraste para mudar o dia`}
     >
       {task.dealName && (
         <div className="text-[9px] text-sky-600 truncate leading-snug">
@@ -410,12 +563,19 @@ function MonthlyTaskItem({
   task: TaskCard;
   onClick: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+  });
   return (
     <button
+      ref={setNodeRef}
       type="button"
       onClick={onClick}
-      className="block w-full text-left bg-sky-50 border border-sky-100 text-sky-800 hover:bg-sky-100 transition rounded px-1.5 py-0.5 text-[10px] truncate cursor-pointer"
-      title={`${task.title} — clique para editar`}
+      {...attributes}
+      {...listeners}
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+      className="block w-full text-left bg-sky-50 border border-sky-100 text-sky-800 hover:bg-sky-100 transition rounded px-1.5 py-0.5 text-[10px] truncate cursor-grab active:cursor-grabbing"
+      title={`${task.title} — clique para editar, arraste para mudar o dia`}
     >
       {task.title}
     </button>
