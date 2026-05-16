@@ -161,6 +161,54 @@ export default function Board() {
     alert("Exclusão pelo Kanban ficará disponível em breve. Mova ou exclua o negócio no Bitrix.");
   }
 
+  async function handleUpdateTask(
+    cardId: string,
+    taskId: string,
+    fields: { title?: string; description?: string }
+  ) {
+    const card = state.cards[cardId];
+    const taskIdx = card?.tasks?.findIndex((t) => t.id === taskId) ?? -1;
+    if (taskIdx < 0 || !card?.tasks) {
+      throw new Error("Tarefa não encontrada");
+    }
+    const prev = card.tasks[taskIdx];
+
+    setState((s) => {
+      const tasks = [...(s.cards[cardId].tasks || [])];
+      tasks[taskIdx] = {
+        ...tasks[taskIdx],
+        ...(fields.title !== undefined && { title: fields.title }),
+        ...(fields.description !== undefined && { description: fields.description }),
+      };
+      return {
+        ...s,
+        cards: { ...s.cards, [cardId]: { ...s.cards[cardId], tasks } },
+      };
+    });
+
+    try {
+      const res = await fetch(`/api/bitrix/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao salvar no Bitrix");
+      }
+    } catch (e: any) {
+      setState((s) => {
+        const tasks = [...(s.cards[cardId].tasks || [])];
+        tasks[taskIdx] = prev;
+        return {
+          ...s,
+          cards: { ...s.cards, [cardId]: { ...s.cards[cardId], tasks } },
+        };
+      });
+      throw e;
+    }
+  }
+
   async function handleUpdateValue(
     cardId: string,
     field: "pontual" | "recurring",
@@ -261,6 +309,7 @@ export default function Board() {
                 onAddCard={() => handleAddCard(col.id)}
                 onDeleteCard={handleDeleteCard}
                 onUpdateValue={handleUpdateValue}
+                onUpdateTask={handleUpdateTask}
               />
             );
           })}

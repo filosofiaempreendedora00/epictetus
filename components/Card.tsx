@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Card as CardType } from "@/lib/types";
+import type { Card as CardType, DealTask } from "@/lib/types";
 import { formatBRL } from "@/lib/initialData";
 
 type Props = {
@@ -11,6 +11,11 @@ type Props = {
   columnId: string;
   onDelete?: () => void;
   onUpdateValue?: (cardId: string, field: "pontual" | "recurring", value: number) => void;
+  onUpdateTask?: (
+    cardId: string,
+    taskId: string,
+    fields: { title?: string; description?: string }
+  ) => Promise<void>;
 };
 
 function pad2(n: number) {
@@ -38,7 +43,6 @@ function formatTaskDeadline(iso: string): string {
 
 function parseInputToNumber(raw: string): number {
   if (!raw) return 0;
-  // aceita "9997", "9997,50", "9.997,50", "9997.50"
   const lastComma = raw.lastIndexOf(",");
   const lastDot = raw.lastIndexOf(".");
   let cleaned: string;
@@ -137,12 +141,137 @@ function MoneyRow({
   );
 }
 
-export default function Card({ card, columnId, onDelete, onUpdateValue }: Props) {
+function TaskEditModal({
+  task,
+  onClose,
+  onSave,
+}: {
+  task: DealTask;
+  onClose: () => void;
+  onSave: (fields: { title: string; description: string }) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function handleSave() {
+    if (!title.trim()) {
+      setError("O nome da tarefa não pode ficar vazio");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({ title: title.trim(), description });
+      onClose();
+    } catch (e: any) {
+      setError(e?.message || "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !saving) onClose();
+      }}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900">Editar tarefa</h2>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-6 h-6 flex items-center justify-center"
+            title="Fechar"
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+              Nome da tarefa
+            </label>
+            <input
+              type="text"
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={saving}
+              className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+              Descrição
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={saving}
+              rows={8}
+              placeholder="Mais detalhes sobre a tarefa…"
+              className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 resize-y disabled:bg-slate-50"
+            />
+          </div>
+
+          {error && (
+            <div className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded px-2.5 py-1.5">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
+          >
+            {saving ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Card({ card, columnId, onDelete, onUpdateValue, onUpdateTask }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
       id: card.id,
       data: { type: "card", columnId },
     });
+
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const editingTask = card.tasks?.find((t) => t.id === editingTaskId) || null;
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -151,136 +280,152 @@ export default function Card({ card, columnId, onDelete, onUpdateValue }: Props)
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="group bg-white rounded-xl shadow-sm px-3 py-2.5 cursor-grab active:cursor-grabbing relative overflow-hidden"
-    >
-      {/* Delete (visible on hover) */}
-      {onDelete && (
-        <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="absolute top-1.5 right-2 opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500 text-xs"
-          title="Excluir"
-        >
-          ✕
-        </button>
-      )}
-
-      {/* Title */}
-      <h3 className="text-slate-900 font-medium leading-snug text-[12px]">
-        {card.title}
-      </h3>
-
-      {/* Valores R e P (sempre visíveis, editáveis) */}
-      <div className="mt-1.5 space-y-0.5">
-        <MoneyRow
-          label="R"
-          value={card.recurring || 0}
-          onSave={
-            onUpdateValue ? (n) => onUpdateValue(card.id, "recurring", n) : undefined
-          }
-        />
-        <MoneyRow
-          label="P"
-          value={card.pontual || 0}
-          onSave={
-            onUpdateValue ? (n) => onUpdateValue(card.id, "pontual", n) : undefined
-          }
-        />
-      </div>
-
-      {/* Date */}
-      <div className="text-slate-400 text-[10px] mt-1">{card.dateLabel}</div>
-
-      {/* Person responsible */}
-      <div className="mt-2 text-[10px] text-slate-500">Pessoa responsável</div>
-      <div className="mt-0.5 flex items-center gap-1.5">
-        <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-[9px]">
-          👤
-        </div>
-        <span className="text-sky-500 text-[12px] truncate">{card.responsible}</span>
-      </div>
-
-      {/* Source */}
-      <div className="mt-1.5 text-[10px] text-slate-500">Fonte</div>
-      <div className="text-slate-800 text-[12px] truncate">{card.source}</div>
-
-      {/* SDR */}
-      {card.sdr && (
-        <>
-          <div className="mt-2 text-[10px] text-slate-500">SDR</div>
-          <div className="text-sky-500 text-[12px]">{card.sdr}</div>
-        </>
-      )}
-
-      {/* Task badge */}
-      {card.taskStatus && (
-        <>
-          <div className="mt-2 text-[10px] text-slate-500">Tarefa</div>
-          <span
-            className={`inline-block mt-0.5 text-[10px] font-semibold px-2 py-1 rounded ${
-              card.taskStatus === "ATRASADA"
-                ? "bg-red-100 text-red-600"
-                : "bg-sky-100 text-sky-600"
-            }`}
+    <>
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        className="group bg-white rounded-xl shadow-sm px-3 py-2.5 cursor-grab active:cursor-grabbing relative overflow-hidden"
+      >
+        {/* Delete (visible on hover) */}
+        {onDelete && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="absolute top-1.5 right-2 opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500 text-xs"
+            title="Excluir"
           >
-            {card.taskStatus}
-          </span>
-        </>
-      )}
+            ✕
+          </button>
+        )}
 
-      {/* Tarefas */}
-      <div className="mt-2 pt-1.5 border-t border-slate-100">
-        {card.tasks && card.tasks.length > 0 ? (
-          <ul className="space-y-1">
-            {card.tasks.map((task) => (
-              <li
-                key={task.id}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] ${
-                  task.overdue
-                    ? "bg-red-50 border-red-100"
-                    : "bg-sky-50 border-sky-100"
-                }`}
-                title={task.title}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    task.overdue ? "bg-red-500" : "bg-sky-500"
+        {/* Title */}
+        <h3 className="text-slate-900 font-medium leading-snug text-[12px]">
+          {card.title}
+        </h3>
+
+        {/* Valores R e P (sempre visíveis, editáveis) */}
+        <div className="mt-1.5 space-y-0.5">
+          <MoneyRow
+            label="R"
+            value={card.recurring || 0}
+            onSave={
+              onUpdateValue ? (n) => onUpdateValue(card.id, "recurring", n) : undefined
+            }
+          />
+          <MoneyRow
+            label="P"
+            value={card.pontual || 0}
+            onSave={
+              onUpdateValue ? (n) => onUpdateValue(card.id, "pontual", n) : undefined
+            }
+          />
+        </div>
+
+        {/* Date */}
+        <div className="text-slate-400 text-[10px] mt-1">{card.dateLabel}</div>
+
+        {/* Person responsible */}
+        <div className="mt-2 text-[10px] text-slate-500">Pessoa responsável</div>
+        <div className="mt-0.5 flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-[9px]">
+            👤
+          </div>
+          <span className="text-sky-500 text-[12px] truncate">{card.responsible}</span>
+        </div>
+
+        {/* Source */}
+        <div className="mt-1.5 text-[10px] text-slate-500">Fonte</div>
+        <div className="text-slate-800 text-[12px] truncate">{card.source}</div>
+
+        {/* SDR */}
+        {card.sdr && (
+          <>
+            <div className="mt-2 text-[10px] text-slate-500">SDR</div>
+            <div className="text-sky-500 text-[12px]">{card.sdr}</div>
+          </>
+        )}
+
+        {/* Task badge (legacy mock) */}
+        {card.taskStatus && (
+          <>
+            <div className="mt-2 text-[10px] text-slate-500">Tarefa</div>
+            <span
+              className={`inline-block mt-0.5 text-[10px] font-semibold px-2 py-1 rounded ${
+                card.taskStatus === "ATRASADA"
+                  ? "bg-red-100 text-red-600"
+                  : "bg-sky-100 text-sky-600"
+              }`}
+            >
+              {card.taskStatus}
+            </span>
+          </>
+        )}
+
+        {/* Tarefas */}
+        <div className="mt-2 pt-1.5 border-t border-slate-100">
+          {card.tasks && card.tasks.length > 0 ? (
+            <ul className="space-y-1">
+              {card.tasks.map((task) => (
+                <li
+                  key={task.id}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingTaskId(task.id);
+                  }}
+                  className={`flex items-start gap-1.5 px-2 py-1 rounded-md border text-[11px] cursor-pointer transition hover:shadow-sm ${
+                    task.overdue
+                      ? "bg-red-50 border-red-100 hover:bg-red-100/70"
+                      : "bg-sky-50 border-sky-100 hover:bg-sky-100/70"
                   }`}
-                />
-                <span
-                  className={`flex-1 truncate font-medium ${
-                    task.overdue ? "text-red-700" : "text-sky-800"
-                  }`}
+                  title="Clique para editar"
                 >
-                  {task.title}
-                </span>
-                {task.deadline && (
                   <span
-                    className={`shrink-0 text-[10px] whitespace-nowrap ${
-                      task.overdue ? "text-red-500" : "text-sky-600"
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 mt-[5px] ${
+                      task.overdue ? "bg-red-500" : "bg-sky-500"
+                    }`}
+                  />
+                  <span
+                    className={`flex-1 break-words font-medium leading-snug ${
+                      task.overdue ? "text-red-700" : "text-sky-800"
                     }`}
                   >
-                    {formatTaskDeadline(task.deadline)}
+                    {task.title}
                   </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-slate-200 text-slate-400 text-[11px]">
-            <span className="leading-none">+</span>
-            <span>Criar tarefa</span>
-          </div>
-        )}
+                  {task.deadline && (
+                    <span
+                      className={`shrink-0 text-[10px] whitespace-nowrap mt-[1px] ${
+                        task.overdue ? "text-red-500" : "text-sky-600"
+                      }`}
+                    >
+                      {formatTaskDeadline(task.deadline)}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-slate-200 text-slate-400 text-[11px]">
+              <span className="leading-none">+</span>
+              <span>Criar tarefa</span>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {editingTask && onUpdateTask && (
+        <TaskEditModal
+          task={editingTask}
+          onClose={() => setEditingTaskId(null)}
+          onSave={(fields) => onUpdateTask(card.id, editingTask.id, fields)}
+        />
+      )}
+    </>
   );
 }

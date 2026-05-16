@@ -3,6 +3,7 @@ export type TaskStatus = "PRAZO ATUALIZADO" | "ATRASADA" | null;
 export type DealTask = {
   id: string;
   title: string;
+  description?: string;
   deadline: string | null;
   overdue: boolean;
 };

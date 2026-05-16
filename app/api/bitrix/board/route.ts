@@ -61,6 +61,7 @@ function parseMoneyField(raw: unknown): number {
 type RawTask = {
   id: string | number;
   title: string;
+  description?: string;
   deadline: string | null;
   status: string | number;
   ufCrmTask?: string[];
@@ -74,7 +75,7 @@ async function fetchOpenTasks(): Promise<RawTask[]> {
       "tasks.task.list",
       {
         filter: { "<STATUS": 5 },
-        select: ["ID", "TITLE", "DEADLINE", "STATUS", "UF_CRM_TASK"],
+        select: ["ID", "TITLE", "DESCRIPTION", "DEADLINE", "STATUS", "UF_CRM_TASK"],
         order: { DEADLINE: "asc" },
         start,
       }
@@ -100,6 +101,7 @@ function groupTasksByDeal(tasks: RawTask[]): Map<string, DealTask[]> {
       const task: DealTask = {
         id: String(t.id),
         title: t.title,
+        description: t.description || "",
         deadline: t.deadline || null,
         overdue,
       };
