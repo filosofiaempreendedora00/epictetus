@@ -348,18 +348,22 @@ export default function Card({
         {/* Date */}
         <div className="text-slate-400 text-[10px] mt-1">{card.dateLabel}</div>
 
-        {/* Person responsible */}
-        <div className="mt-2 text-[10px] text-slate-500">Pessoa responsável</div>
-        <div className="mt-0.5 flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-[9px]">
-            👤
+        {/* Pessoa responsável + Fonte (lado a lado) */}
+        <div className="mt-2 flex gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-[9px] text-slate-500">Responsável</div>
+            <div className="mt-0.5 flex items-center gap-1 min-w-0">
+              <div className="w-3.5 h-3.5 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-[8px] shrink-0">
+                👤
+              </div>
+              <span className="text-sky-500 text-[11px] truncate">{card.responsible}</span>
+            </div>
           </div>
-          <span className="text-sky-500 text-[12px] truncate">{card.responsible}</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[9px] text-slate-500">Fonte</div>
+            <div className="mt-0.5 text-slate-800 text-[11px] truncate">{card.source}</div>
+          </div>
         </div>
-
-        {/* Source */}
-        <div className="mt-1.5 text-[10px] text-slate-500">Fonte</div>
-        <div className="text-slate-800 text-[12px] truncate">{card.source}</div>
 
         {/* SDR */}
         {card.sdr && (
