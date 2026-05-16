@@ -78,6 +78,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [dateView, setDateView] = useState<DateView>("weekly");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [creatingTask, setCreatingTask] = useState(false);
 
   const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
   const draggedTask = draggedTaskId ? state.tasks[draggedTaskId] : null;
@@ -85,6 +86,50 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
+
+  async function handleCreateTask(fields: {
+    title: string;
+    description: string;
+    deadline: string | null;
+    dealId?: string;
+  }) {
+    if (!fields.dealId) throw new Error("Selecione o negócio do Kanban");
+    const res = await fetch("/api/bitrix/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: fields.title,
+        description: fields.description,
+        dealId: fields.dealId,
+        deadline: fields.deadline,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.error || "Falha ao criar tarefa no Bitrix");
+    }
+    const created = (await res.json()) as {
+      id: string;
+      title: string;
+      description?: string;
+      deadline: string | null;
+    };
+    const dealName = state.deals?.find((d) => d.id === fields.dealId)?.name;
+    const newId = `task-${created.id}`;
+    const newCard: TaskCard = {
+      id: newId,
+      bitrixId: String(created.id),
+      title: created.title,
+      description: created.description || "",
+      deadline: created.deadline,
+      dealId: fields.dealId,
+      dealName,
+    };
+    setState((s) => ({
+      ...s,
+      tasks: { ...s.tasks, [newId]: newCard },
+    }));
+  }
 
   async function handleSaveTask(fields: {
     title: string;
@@ -234,7 +279,16 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
 
   return (
     <div className="px-6 pb-6">
-      <DateViewSwitcher value={dateView} onChange={setDateView} />
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <DateViewSwitcher value={dateView} onChange={setDateView} />
+        <button
+          type="button"
+          onClick={() => setCreatingTask(true)}
+          className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition shadow-md shadow-emerald-500/20"
+        >
+          <span className="text-base leading-none">+</span> Criar tarefa
+        </button>
+      </div>
 
       <DndContext
         sensors={sensors}
@@ -281,6 +335,19 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           onSave={handleSaveTask}
         />
       )}
+
+      {creatingTask && (
+        <TaskEditModal
+          heading="Nova tarefa"
+          initialTitle=""
+          initialDescription=""
+          initialDeadline={null}
+          dealsForSelect={state.deals || []}
+          saveLabel="Criar"
+          onClose={() => setCreatingTask(false)}
+          onSave={handleCreateTask}
+        />
+      )}
     </div>
   );
 }
@@ -298,7 +365,7 @@ function DateViewSwitcher({
     { key: "monthly", label: "Mensal" },
   ];
   return (
-    <div className="mb-3 inline-flex items-center gap-1 bg-white/[0.04] border border-white/10 rounded-lg p-1">
+    <div className="inline-flex items-center gap-1 bg-white/[0.04] border border-white/10 rounded-lg p-1">
       {opts.map((o) => (
         <button
           key={o.key}

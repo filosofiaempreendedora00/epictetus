@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bitrix } from "@/lib/bitrix";
+import { bitrix, bitrixListAll } from "@/lib/bitrix";
 import type { DealTask, TaskCard, TasksBoardState } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -78,7 +78,21 @@ export async function GET() {
       };
     }
 
-    const state: TasksBoardState = { tasks: tasksMap };
+    // Lista de negócios do Roberto (Pipeline Commerce) pra dropdown de criação
+    const robertoDeals = await bitrixListAll<{ ID: string; TITLE: string }>(
+      "crm.deal.list",
+      {
+        filter: { CATEGORY_ID: 0, ASSIGNED_BY_ID: responsibleId },
+        select: ["ID", "TITLE"],
+        order: { TITLE: "ASC" },
+      }
+    );
+    const dealsForSelect = robertoDeals.map((d) => ({
+      id: d.ID,
+      name: d.TITLE || `Negócio ${d.ID}`,
+    }));
+
+    const state: TasksBoardState = { tasks: tasksMap, deals: dealsForSelect };
     return NextResponse.json(state);
   } catch (e: any) {
     return NextResponse.json(

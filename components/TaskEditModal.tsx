@@ -2,17 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 
+type DealOption = { id: string; name: string };
+
 type Props = {
   heading: string;
   initialTitle: string;
   initialDescription: string;
   initialDeadline?: string | null;
+  initialDealId?: string | null;
+  dealsForSelect?: DealOption[];
   saveLabel: string;
   onClose: () => void;
   onSave: (fields: {
     title: string;
     description: string;
     deadline: string | null;
+    dealId?: string;
   }) => Promise<void>;
 };
 
@@ -209,6 +214,8 @@ export default function TaskEditModal({
   initialTitle,
   initialDescription,
   initialDeadline,
+  initialDealId,
+  dealsForSelect,
   saveLabel,
   onClose,
   onSave,
@@ -218,10 +225,12 @@ export default function TaskEditModal({
   const [deadline, setDeadline] = useState(() =>
     snapTo15Minutes(isoToLocalInput(initialDeadline))
   );
+  const [dealId, setDealId] = useState<string>(initialDealId || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { date: dlDate, hour: dlHour, minute: dlMinute } = splitLocal(deadline);
+  const showDealSelector = Array.isArray(dealsForSelect);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -236,6 +245,10 @@ export default function TaskEditModal({
       setError("O nome da tarefa não pode ficar vazio");
       return;
     }
+    if (showDealSelector && !dealId) {
+      setError("Selecione o negócio do Kanban");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -243,6 +256,7 @@ export default function TaskEditModal({
         title: title.trim(),
         description,
         deadline: deadline ? localInputToBitrix(deadline) : null,
+        ...(showDealSelector ? { dealId } : {}),
       });
       onClose();
     } catch (e: any) {
@@ -292,6 +306,29 @@ export default function TaskEditModal({
               className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
             />
           </div>
+
+          {showDealSelector && (
+            <div>
+              <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+                Negócio do Kanban
+              </label>
+              <select
+                value={dealId}
+                onChange={(e) => setDealId(e.target.value)}
+                disabled={saving}
+                className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 bg-white"
+              >
+                <option value="" disabled>
+                  Selecione um negócio…
+                </option>
+                {(dealsForSelect || []).map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">

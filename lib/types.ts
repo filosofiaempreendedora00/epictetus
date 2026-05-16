@@ -49,4 +49,5 @@ export type TaskCard = {
 
 export type TasksBoardState = {
   tasks: Record<string, TaskCard>;
+  deals?: Array<{ id: string; name: string }>;
 };
