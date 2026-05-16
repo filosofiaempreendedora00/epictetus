@@ -26,13 +26,19 @@ type Stage = {
   SEMANTICS: string | null;
 };
 
-// Etapas visíveis no Kanban: em andamento (SEMANTICS=null) + Negócio perdido (APOLOGY).
-// Exclui: Ganho (WON), Congelado (LOSE), Descartado (UC_QCL40Q).
-const EXTRA_VISIBLE_STAGES = new Set(["APOLOGY"]);
+// Etapas visíveis no Kanban: em andamento (SEMANTICS=null) + Congelados (LOSE)
+// + Negócio perdido (APOLOGY). Exclui: Ganho (WON), Descartado (UC_QCL40Q).
+const EXTRA_VISIBLE_STAGES = new Set(["LOSE", "APOLOGY"]);
 function isStageVisible(s: Stage): boolean {
   if (s.SEMANTICS === null || s.SEMANTICS === "") return true;
   return EXTRA_VISIBLE_STAGES.has(s.STATUS_ID);
 }
+
+// Cores forçadas para etapas específicas (sobrescreve a paleta padrão).
+const STAGE_COLOR_BY_ID: Record<string, string> = {
+  LOSE: "from-[#94a3b8] to-[#64748b]",      // Congelados - cinza-azulado (frio)
+  APOLOGY: "from-[#ef4444] to-[#dc2626]",   // Negócio perdido - vermelho
+};
 
 type Deal = {
   ID: string;
@@ -207,7 +213,7 @@ export async function GET() {
     const columns: Column[] = sortedStages.map((s, i) => ({
       id: `col-${s.STATUS_ID}`,
       title: s.NAME,
-      color: STAGE_COLORS[i % STAGE_COLORS.length],
+      color: STAGE_COLOR_BY_ID[s.STATUS_ID] || STAGE_COLORS[i % STAGE_COLORS.length],
       cardIds: [],
       stageId: s.STATUS_ID,
     }));
