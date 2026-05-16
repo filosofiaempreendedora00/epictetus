@@ -1,38 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { TasksBoardState, TaskCard, TaskColumn } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import type { TasksBoardState, TaskCard } from "@/lib/types";
 
-const EMPTY: TasksBoardState = { columns: [], tasks: {} };
+const EMPTY: TasksBoardState = { tasks: {} };
 
-const PT_MONTH = [
+const DOW_SHORT = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] as const;
+const PT_MONTH_LONG = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
   "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
 ];
+
+type DateView = "weekly" | "biweekly" | "monthly";
 
 function pad2(n: number) {
   return n < 10 ? `0${n}` : String(n);
 }
 
-function formatDeadline(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  const hh = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  if (sameDay) return `hoje, ${hh}`;
-  const sameYear = d.getFullYear() === now.getFullYear();
-  const ddmm = `${d.getDate()} de ${PT_MONTH[d.getMonth()]}`;
-  return sameYear ? `${ddmm}, ${hh}` : `${ddmm} de ${d.getFullYear()}, ${hh}`;
+function startOfWeekSunday(d: Date): Date {
+  const r = new Date(d);
+  r.setHours(0, 0, 0, 0);
+  r.setDate(r.getDate() - r.getDay());
+  return r;
+}
+
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
 export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [state, setState] = useState<TasksBoardState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dateView, setDateView] = useState<DateView>("weekly");
 
   useEffect(() => {
     let cancelled = false;
@@ -41,11 +55,8 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
         const res = await fetch("/api/bitrix/tasks", { cache: "no-store" });
         const data = await res.json();
         if (cancelled) return;
-        if (!res.ok) {
-          setError(data?.error || "Erro ao carregar tarefas");
-        } else {
-          setState(data as TasksBoardState);
-        }
+        if (!res.ok) setError(data?.error || "Erro ao carregar tarefas");
+        else setState(data as TasksBoardState);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Erro de rede");
       } finally {
@@ -57,19 +68,32 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     };
   }, []);
 
-  function filterIds(ids: string[]): string[] {
+  // Agrupa tarefas por dia (chave YYYY-MM-DD do deadline)
+  const tasksByDay = useMemo(() => {
+    const m = new Map<string, TaskCard[]>();
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return ids;
-    return ids.filter((id) => {
-      const t = state.tasks[id];
-      if (!t) return false;
-      return (
-        t.title.toLowerCase().includes(q) ||
-        t.dealName?.toLowerCase().includes(q) ||
-        false
+    for (const t of Object.values(state.tasks)) {
+      if (!t.deadline) continue;
+      if (q) {
+        const matches =
+          t.title.toLowerCase().includes(q) ||
+          t.dealName?.toLowerCase().includes(q);
+        if (!matches) continue;
+      }
+      const d = new Date(t.deadline);
+      if (isNaN(d.getTime())) continue;
+      const key = dayKey(d);
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push(t);
+    }
+    // ordena por horário do deadline dentro de cada dia
+    for (const arr of m.values()) {
+      arr.sort((a, b) =>
+        (a.deadline || "").localeCompare(b.deadline || "")
       );
-    });
-  }
+    }
+    return m;
+  }, [state.tasks, searchTerm]);
 
   if (loading) {
     return (
@@ -89,96 +113,234 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto px-6 pb-6 col-scroll">
-      {state.columns.map((col) => {
-        const ids = filterIds(col.taskIds);
-        const tasks = ids.map((id) => state.tasks[id]).filter(Boolean);
-        return <ColumnView key={col.id} column={col} tasks={tasks} />;
-      })}
-    </div>
-  );
-}
-
-function ColumnView({ column, tasks }: { column: TaskColumn; tasks: TaskCard[] }) {
-  return (
-    <div className="flex flex-col w-[260px] shrink-0">
-      <div
-        className={`bg-gradient-to-r ${column.color} rounded-t-2xl px-4 py-3 flex items-center justify-between shadow-md`}
-      >
-        <div className="flex items-center gap-2 text-white font-medium text-sm">
-          <span>{column.title}</span>
-          <span className="text-white/85">{tasks.length}</span>
-        </div>
-      </div>
-
-      <div
-        className="flex-1 px-2 py-2 space-y-2 col-scroll overflow-y-auto min-h-[200px] border-x border-white/5"
-        style={{ maxHeight: "calc(100vh - 240px)" }}
-      >
-        {tasks.length === 0 && (
-          <div className="text-center text-white/30 text-[11px] py-6">
-            Nenhuma tarefa
-          </div>
-        )}
-        {tasks.map((task) => (
-          <TaskCardView key={task.id} task={task} bucketId={column.id} />
-        ))}
-      </div>
-
-      <div className="bg-white/[0.02] border-x border-b border-white/5 rounded-b-2xl h-3" />
-    </div>
-  );
-}
-
-function TaskCardView({
-  task,
-  bucketId,
-}: {
-  task: TaskCard;
-  bucketId: string;
-}) {
-  const overdue = bucketId === "overdue";
-  const isToday = bucketId === "today";
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm px-3 py-2.5">
-      <h3 className="text-slate-900 font-medium text-[13px] leading-snug break-words">
-        {task.title}
-      </h3>
-
-      {task.dealName ? (
-        <>
-          <div className="mt-2 text-[9px] text-slate-500">Negócio</div>
-          <div className="text-sky-600 text-[12px] leading-snug break-words">
-            {task.dealName}
-          </div>
-        </>
+    <div className="px-6 pb-6">
+      <DateViewSwitcher value={dateView} onChange={setDateView} />
+      {dateView === "monthly" ? (
+        <MonthlyView tasksByDay={tasksByDay} />
       ) : (
-        <div className="mt-2 text-[10px] text-slate-400">Sem negócio vinculado</div>
+        <DayColumnsView
+          tasksByDay={tasksByDay}
+          days={dateView === "weekly" ? 7 : 14}
+        />
       )}
+    </div>
+  );
+}
 
-      {task.deadline ? (
-        <div
-          className={`mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] ${
-            overdue
-              ? "bg-red-50 border-red-100 text-red-700"
-              : isToday
-              ? "bg-lime-50 border-lime-100 text-lime-700"
-              : "bg-sky-50 border-sky-100 text-sky-700"
+function DateViewSwitcher({
+  value,
+  onChange,
+}: {
+  value: DateView;
+  onChange: (v: DateView) => void;
+}) {
+  const opts: { key: DateView; label: string }[] = [
+    { key: "weekly", label: "Semanal" },
+    { key: "biweekly", label: "2 Semanas" },
+    { key: "monthly", label: "Mensal" },
+  ];
+  return (
+    <div className="mb-3 inline-flex items-center gap-1 bg-white/[0.04] border border-white/10 rounded-lg p-1">
+      {opts.map((o) => (
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          className={`px-3 py-1 text-[12px] rounded-md transition ${
+            value === o.key
+              ? "bg-white/15 text-white font-medium shadow-sm"
+              : "text-white/55 hover:text-white/85"
           }`}
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              overdue ? "bg-red-500" : isToday ? "bg-lime-500" : "bg-sky-500"
-            }`}
-          />
-          <span className="whitespace-nowrap">{formatDeadline(task.deadline)}</span>
-        </div>
-      ) : (
-        <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 text-slate-500 text-[10px]">
-          Sem prazo
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DayColumnsView({
+  tasksByDay,
+  days,
+}: {
+  tasksByDay: Map<string, TaskCard[]>;
+  days: number;
+}) {
+  const now = new Date();
+  const start = startOfWeekSunday(now);
+  const dayList = Array.from({ length: days }, (_, i) => addDays(start, i));
+
+  return (
+    <div className="border-t border-white/10">
+      {/* Cabeçalho de dias */}
+      <div className="flex">
+        {dayList.map((d) => {
+          const today = isSameDay(d, now);
+          return (
+            <div
+              key={dayKey(d)}
+              className="flex-1 min-w-0 border-r border-white/5 px-2 py-2 flex items-baseline gap-2"
+            >
+              <span className="text-white/40 text-[11px] uppercase tracking-wide">
+                {DOW_SHORT[d.getDay()]}
+              </span>
+              {today ? (
+                <span className="bg-red-500 text-white text-[11px] font-semibold rounded-full w-5 h-5 inline-flex items-center justify-center">
+                  {d.getDate()}
+                </span>
+              ) : (
+                <span className="text-white/70 text-[12px] font-medium">
+                  {d.getDate()}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Colunas com tarefas */}
+      <div className="flex" style={{ minHeight: "calc(100vh - 280px)" }}>
+        {dayList.map((d) => {
+          const today = isSameDay(d, now);
+          const tasks = tasksByDay.get(dayKey(d)) || [];
+          return (
+            <div
+              key={dayKey(d)}
+              className={`flex-1 min-w-0 border-r border-white/5 p-1.5 space-y-1.5 col-scroll overflow-y-auto ${
+                today ? "bg-white/[0.03]" : ""
+              }`}
+              style={{ maxHeight: "calc(100vh - 280px)" }}
+            >
+              {tasks.length === 0 && (
+                <div className="text-center text-white/15 text-[10px] py-4 select-none">
+                  —
+                </div>
+              )}
+              {tasks.map((t) => (
+                <TaskMiniCard key={t.id} task={t} />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MonthlyView({
+  tasksByDay,
+}: {
+  tasksByDay: Map<string, TaskCard[]>;
+}) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const lastOfMonth = new Date(year, month + 1, 0);
+  const gridStart = startOfWeekSunday(firstOfMonth);
+  const gridEndExclusive = addDays(
+    startOfWeekSunday(lastOfMonth),
+    7
+  );
+  const totalDays =
+    (gridEndExclusive.getTime() - gridStart.getTime()) / (1000 * 60 * 60 * 24);
+  const dayList = Array.from({ length: Math.round(totalDays) }, (_, i) =>
+    addDays(gridStart, i)
+  );
+
+  return (
+    <div className="border border-white/10 rounded-lg overflow-hidden bg-white/[0.02]">
+      <div className="px-3 py-2 text-white/70 text-sm font-medium">
+        {PT_MONTH_LONG[month]} {year}
+      </div>
+      <div className="grid grid-cols-7 border-t border-white/10">
+        {DOW_SHORT.map((d) => (
+          <div
+            key={d}
+            className="text-[10px] uppercase tracking-wide text-white/40 px-2 py-1 border-r border-white/5 last:border-r-0"
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 border-t border-white/10">
+        {dayList.map((d) => {
+          const inMonth = d.getMonth() === month;
+          const today = isSameDay(d, now);
+          const tasks = tasksByDay.get(dayKey(d)) || [];
+          return (
+            <div
+              key={dayKey(d)}
+              className={`min-h-[90px] border-r border-b border-white/5 p-1.5 last:border-r-0 ${
+                inMonth ? "" : "bg-black/20"
+              } ${today ? "bg-white/[0.04]" : ""}`}
+            >
+              <div className="flex items-center justify-end mb-1">
+                {today ? (
+                  <span className="bg-red-500 text-white text-[10px] font-semibold rounded-full w-5 h-5 inline-flex items-center justify-center">
+                    {d.getDate()}
+                  </span>
+                ) : (
+                  <span
+                    className={`text-[11px] ${
+                      inMonth ? "text-white/70" : "text-white/25"
+                    }`}
+                  >
+                    {d.getDate()}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1">
+                {tasks.slice(0, 3).map((t) => (
+                  <MonthlyTaskItem key={t.id} task={t} />
+                ))}
+                {tasks.length > 3 && (
+                  <div className="text-[9px] text-white/40">
+                    +{tasks.length - 3} mais
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TaskMiniCard({ task }: { task: TaskCard }) {
+  const time = task.deadline
+    ? new Date(task.deadline)
+    : null;
+  const hhmm = time
+    ? `${pad2(time.getHours())}:${pad2(time.getMinutes())}`
+    : "";
+  return (
+    <div
+      className="bg-white rounded-md shadow-sm px-2 py-1.5 cursor-default"
+      title={task.title}
+    >
+      {task.dealName && (
+        <div className="text-[9px] text-sky-600 truncate leading-snug">
+          {task.dealName}
         </div>
       )}
+      <div className="text-slate-900 text-[11px] font-medium leading-snug break-words">
+        {task.title}
+      </div>
+      {hhmm && (
+        <div className="text-[9px] text-slate-400 mt-0.5">{hhmm}</div>
+      )}
+    </div>
+  );
+}
+
+function MonthlyTaskItem({ task }: { task: TaskCard }) {
+  return (
+    <div
+      className="bg-sky-50 border border-sky-100 text-sky-800 rounded px-1.5 py-0.5 text-[10px] truncate"
+      title={task.title}
+    >
+      {task.title}
     </div>
   );
 }

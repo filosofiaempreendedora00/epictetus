@@ -37,20 +37,6 @@ export type BoardState = {
   cards: Record<string, Card>;
 };
 
-export type TaskBucket =
-  | "overdue"
-  | "today"
-  | "this_week"
-  | "next_week"
-  | "no_deadline";
-
-export type TaskColumn = {
-  id: TaskBucket;
-  title: string;
-  color: string;
-  taskIds: string[];
-};
-
 export type TaskCard = {
   id: string;
   bitrixId: string;
@@ -62,6 +48,5 @@ export type TaskCard = {
 };
 
 export type TasksBoardState = {
-  columns: TaskColumn[];
   tasks: Record<string, TaskCard>;
 };

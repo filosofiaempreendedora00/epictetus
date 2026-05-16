@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bitrix } from "@/lib/bitrix";
-import type { DealTask, TaskCard, TaskColumn, TasksBoardState } from "@/lib/types";
+import type { DealTask, TaskCard, TasksBoardState } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -62,54 +62,12 @@ export async function GET() {
       for (const d of deals) dealMap.set(d.ID, d.TITLE);
     }
 
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfTomorrow = new Date(startOfToday);
-    startOfTomorrow.setDate(startOfToday.getDate() + 1);
-    const day = startOfToday.getDay();
-    const daysToMonday = ((8 - day) % 7) || 7;
-    const startOfNextMonday = new Date(startOfToday);
-    startOfNextMonday.setDate(startOfToday.getDate() + daysToMonday);
-    const startOfWeekAfterNext = new Date(startOfNextMonday);
-    startOfWeekAfterNext.setDate(startOfNextMonday.getDate() + 7);
-
-    const overdue: TaskColumn = {
-      id: "overdue",
-      title: "Vencido",
-      color: "from-red-500 to-red-600",
-      taskIds: [],
-    };
-    const today: TaskColumn = {
-      id: "today",
-      title: "Vencimento hoje",
-      color: "from-lime-500 to-lime-600",
-      taskIds: [],
-    };
-    const thisWeek: TaskColumn = {
-      id: "this_week",
-      title: "Vencimento esta semana",
-      color: "from-sky-400 to-sky-500",
-      taskIds: [],
-    };
-    const nextWeek: TaskColumn = {
-      id: "next_week",
-      title: "Vencimento na próxima semana",
-      color: "from-cyan-400 to-teal-400",
-      taskIds: [],
-    };
-    const noDeadline: TaskColumn = {
-      id: "no_deadline",
-      title: "Sem prazo",
-      color: "from-slate-500 to-slate-600",
-      taskIds: [],
-    };
-
     const tasksMap: Record<string, TaskCard> = {};
     for (const t of tasksRaw) {
       const id = `task-${t.id}`;
       const dealLinks = (t.ufCrmTask || []).filter((l) => l.startsWith("D_"));
       const dealId = dealLinks[0]?.slice(2);
-      const card: TaskCard = {
+      tasksMap[id] = {
         id,
         bitrixId: String(t.id),
         title: t.title,
@@ -118,31 +76,9 @@ export async function GET() {
         dealId,
         dealName: dealId ? dealMap.get(dealId) : undefined,
       };
-      tasksMap[id] = card;
-
-      if (!t.deadline) {
-        noDeadline.taskIds.push(id);
-        continue;
-      }
-      const dl = new Date(t.deadline);
-      if (isNaN(dl.getTime())) {
-        noDeadline.taskIds.push(id);
-      } else if (dl < startOfToday) {
-        overdue.taskIds.push(id);
-      } else if (dl < startOfTomorrow) {
-        today.taskIds.push(id);
-      } else if (dl < startOfNextMonday) {
-        thisWeek.taskIds.push(id);
-      } else if (dl < startOfWeekAfterNext) {
-        nextWeek.taskIds.push(id);
-      }
-      // tarefas além da próxima semana: ficam fora da visão por enquanto
     }
 
-    const state: TasksBoardState = {
-      columns: [overdue, today, thisWeek, nextWeek, noDeadline],
-      tasks: tasksMap,
-    };
+    const state: TasksBoardState = { tasks: tasksMap };
     return NextResponse.json(state);
   } catch (e: any) {
     return NextResponse.json(
