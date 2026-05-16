@@ -36,7 +36,8 @@ function isStageVisible(s: Stage): boolean {
 
 // Cores forçadas para etapas específicas (sobrescreve a paleta padrão).
 const STAGE_COLOR_BY_ID: Record<string, string> = {
-  LOSE: "from-[#94a3b8] to-[#64748b]",      // Congelados - cinza-azulado (frio)
+  UC_YN6AV9: "from-[#94a3b8] to-[#64748b]", // Aguardado os dados - cinza-azulado
+  LOSE: "from-[#ace9fb] to-[#9fdcef]",      // Congelados - azul-claro (frio)
   APOLOGY: "from-[#ef4444] to-[#dc2626]",   // Negócio perdido - vermelho
 };
 
