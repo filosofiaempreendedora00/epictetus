@@ -138,6 +138,7 @@ export default function TaskEditModal({
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
                 disabled={saving}
+                step={900}
                 className="flex-1 text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
               />
               {deadline && (
