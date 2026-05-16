@@ -1,0 +1,19 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Negócios — Pipeline Commerce",
+  description: "Kanban de negócios",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="pt-BR">
+      <body className="font-sans antialiased">{children}</body>
+    </html>
+  );
+}

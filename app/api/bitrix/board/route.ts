@@ -1,0 +1,174 @@
+import { NextResponse } from "next/server";
+import { bitrix, bitrixListAll } from "@/lib/bitrix";
+import type { BoardState, Card, Column } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+const STAGE_COLORS: string[] = [
+  "from-[#2c7cb0] to-[#3a8cc0]",
+  "from-[#3aacd9] to-[#46bfe0]",
+  "from-[#4dd0ce] to-[#55dcc8]",
+  "from-[#5fe0b7] to-[#6ce8a5]",
+  "from-[#ffb84d] to-[#ffa900]",
+  "from-[#ace9fb] to-[#9fdcef]",
+  "from-[#c9b8ff] to-[#a98bff]",
+  "from-[#ffd1a1] to-[#ffb273]",
+  "from-[#7bd500] to-[#5fb000]",
+  "from-[#f39c5a] to-[#f36509]",
+  "from-[#f56565] to-[#f11716]",
+  "from-[#a3201e] to-[#9e0502]",
+];
+
+type Stage = {
+  STATUS_ID: string;
+  NAME: string;
+  SORT: string;
+  SEMANTICS: string | null;
+};
+
+// Etapas visíveis no Kanban: em andamento (SEMANTICS=null) + Negócio perdido (APOLOGY).
+// Exclui: Ganho (WON), Congelado (LOSE), Descartado (UC_QCL40Q).
+const EXTRA_VISIBLE_STAGES = new Set(["APOLOGY"]);
+function isStageVisible(s: Stage): boolean {
+  if (s.SEMANTICS === null || s.SEMANTICS === "") return true;
+  return EXTRA_VISIBLE_STAGES.has(s.STATUS_ID);
+}
+
+type Deal = {
+  ID: string;
+  TITLE: string;
+  STAGE_ID: string;
+  OPPORTUNITY: string;
+  ASSIGNED_BY_ID: string;
+  SOURCE_ID: string;
+  DATE_MODIFY: string;
+};
+
+type BitrixUser = {
+  ID: string;
+  NAME?: string;
+  LAST_NAME?: string;
+};
+
+type StatusRow = {
+  STATUS_ID: string;
+  NAME: string;
+};
+
+const PT_MONTH = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
+
+function dateLabel(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const isSameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (isSameDay) {
+    return `hoje, ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  }
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  const isYesterday =
+    d.getFullYear() === y.getFullYear() &&
+    d.getMonth() === y.getMonth() &&
+    d.getDate() === y.getDate();
+  if (isYesterday) {
+    return `ontem, ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  }
+  return `${d.getDate()} de ${PT_MONTH[d.getMonth()]}`;
+}
+
+export async function GET() {
+  try {
+    const responsibleId = process.env.BITRIX_RESPONSIBLE_USER_ID;
+    if (!responsibleId) {
+      return NextResponse.json(
+        { error: "BITRIX_RESPONSIBLE_USER_ID não está configurado em .env.local" },
+        { status: 500 }
+      );
+    }
+
+    const dealFilter: Record<string, any> = {
+      CATEGORY_ID: 0,
+      ASSIGNED_BY_ID: responsibleId,
+    };
+
+    const [stagesRaw, dealsRaw, sourcesRaw, usersRaw] = await Promise.all([
+      bitrix<StatusRow[]>("crm.status.list", {
+        filter: { ENTITY_ID: "DEAL_STAGE" },
+        order: { SORT: "ASC" },
+      }) as Promise<Stage[]>,
+      bitrixListAll<Deal>("crm.deal.list", {
+        filter: dealFilter,
+        select: [
+          "ID", "TITLE", "STAGE_ID", "OPPORTUNITY",
+          "ASSIGNED_BY_ID", "SOURCE_ID", "DATE_MODIFY",
+        ],
+        order: { DATE_MODIFY: "DESC" },
+      }),
+      bitrix<StatusRow[]>("crm.status.list", {
+        filter: { ENTITY_ID: "SOURCE" },
+      }),
+      bitrix<BitrixUser[]>("user.get", { ACTIVE: true }),
+    ]);
+
+    const stages = stagesRaw.filter(isStageVisible);
+
+    const sourceMap = new Map<string, string>();
+    (sourcesRaw || []).forEach((s) => sourceMap.set(s.STATUS_ID, s.NAME));
+
+    const userMap = new Map<string, string>();
+    (usersRaw || []).forEach((u) => {
+      const full = `${u.NAME || ""} ${u.LAST_NAME || ""}`.trim();
+      userMap.set(u.ID, full || `Usuário ${u.ID}`);
+    });
+
+    const sortedStages = [...stages].sort(
+      (a, b) => parseInt(a.SORT, 10) - parseInt(b.SORT, 10)
+    );
+
+    const columns: Column[] = sortedStages.map((s, i) => ({
+      id: `col-${s.STATUS_ID}`,
+      title: s.NAME,
+      color: STAGE_COLORS[i % STAGE_COLORS.length],
+      cardIds: [],
+      stageId: s.STATUS_ID,
+    }));
+
+    const colByStage = new Map<string, Column>();
+    columns.forEach((c) => {
+      if (c.stageId) colByStage.set(c.stageId, c);
+    });
+
+    const cards: Record<string, Card> = {};
+    for (const d of dealsRaw) {
+      const id = `card-${d.ID}`;
+      const value = parseFloat(d.OPPORTUNITY) || 0;
+      const card: Card = {
+        id,
+        bitrixId: d.ID,
+        title: d.TITLE || "(sem título)",
+        value,
+        dateLabel: dateLabel(d.DATE_MODIFY),
+        responsible: userMap.get(d.ASSIGNED_BY_ID) || `Usuário ${d.ASSIGNED_BY_ID}`,
+        source: sourceMap.get(d.SOURCE_ID) || d.SOURCE_ID || "—",
+      };
+      cards[id] = card;
+      const col = colByStage.get(d.STAGE_ID);
+      if (col) col.cardIds.push(id);
+    }
+
+    const state: BoardState = { columns, cards };
+    return NextResponse.json(state);
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message || "Erro ao buscar board" },
+      { status: 500 }
+    );
+  }
+}
