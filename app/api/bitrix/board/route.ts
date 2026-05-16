@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bitrix, bitrixListAll } from "@/lib/bitrix";
-import type { BoardState, Card, Column } from "@/lib/types";
+import type { BoardState, Card, Column, DealTask } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +58,58 @@ function parseMoneyField(raw: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+type RawTask = {
+  id: string | number;
+  title: string;
+  deadline: string | null;
+  status: string | number;
+  ufCrmTask?: string[];
+};
+
+async function fetchOpenTasks(): Promise<RawTask[]> {
+  const out: RawTask[] = [];
+  let start = 0;
+  for (let i = 0; i < 50; i++) {
+    const resp = await bitrix<{ tasks: RawTask[] } | RawTask[]>(
+      "tasks.task.list",
+      {
+        filter: { "<STATUS": 5 },
+        select: ["ID", "TITLE", "DEADLINE", "STATUS", "UF_CRM_TASK"],
+        order: { DEADLINE: "asc" },
+        start,
+      }
+    );
+    const chunk = Array.isArray(resp) ? resp : resp.tasks || [];
+    out.push(...chunk);
+    if (chunk.length < 50) break;
+    start += 50;
+  }
+  return out;
+}
+
+function groupTasksByDeal(tasks: RawTask[]): Map<string, DealTask[]> {
+  const map = new Map<string, DealTask[]>();
+  const now = Date.now();
+  for (const t of tasks) {
+    const links = t.ufCrmTask || [];
+    for (const link of links) {
+      if (!link.startsWith("D_")) continue;
+      const dealId = link.slice(2);
+      const deadlineMs = t.deadline ? new Date(t.deadline).getTime() : NaN;
+      const overdue = !isNaN(deadlineMs) && deadlineMs < now;
+      const task: DealTask = {
+        id: String(t.id),
+        title: t.title,
+        deadline: t.deadline || null,
+        overdue,
+      };
+      if (!map.has(dealId)) map.set(dealId, []);
+      map.get(dealId)!.push(task);
+    }
+  }
+  return map;
+}
+
 type BitrixUser = {
   ID: string;
   NAME?: string;
@@ -112,7 +164,7 @@ export async function GET() {
       ASSIGNED_BY_ID: responsibleId,
     };
 
-    const [stagesRaw, dealsRaw, sourcesRaw, usersRaw] = await Promise.all([
+    const [stagesRaw, dealsRaw, sourcesRaw, usersRaw, tasksResp] = await Promise.all([
       bitrix<StatusRow[]>("crm.status.list", {
         filter: { ENTITY_ID: "DEAL_STAGE" },
         order: { SORT: "ASC" },
@@ -130,7 +182,10 @@ export async function GET() {
         filter: { ENTITY_ID: "SOURCE" },
       }),
       bitrix<BitrixUser[]>("user.get", { ACTIVE: true }),
+      fetchOpenTasks(),
     ]);
+
+    const tasksByDealId = groupTasksByDeal(tasksResp);
 
     const stages = stagesRaw.filter(isStageVisible);
 
@@ -173,6 +228,7 @@ export async function GET() {
         source: sourceMap.get(d.SOURCE_ID) || d.SOURCE_ID || "—",
         pontual: parseMoneyField(d[FIELD_VALOR_PONTUAL]),
         recurring: parseMoneyField(d[FIELD_VALOR_RECORRENTE]),
+        tasks: tasksByDealId.get(d.ID) || [],
       };
       cards[id] = card;
       const col = colByStage.get(d.STAGE_ID);

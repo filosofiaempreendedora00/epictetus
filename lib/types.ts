@@ -1,5 +1,12 @@
 export type TaskStatus = "PRAZO ATUALIZADO" | "ATRASADA" | null;
 
+export type DealTask = {
+  id: string;
+  title: string;
+  deadline: string | null;
+  overdue: boolean;
+};
+
 export type Card = {
   id: string;
   title: string;
@@ -13,6 +20,7 @@ export type Card = {
   taskStatus?: TaskStatus;
   notifications?: number;
   bitrixId?: string;
+  tasks?: DealTask[];
 };
 
 export type Column = {

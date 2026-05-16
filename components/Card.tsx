@@ -13,6 +13,29 @@ type Props = {
   onUpdateValue?: (cardId: string, field: "pontual" | "recurring", value: number) => void;
 };
 
+function pad2(n: number) {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function formatTaskDeadline(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) return `hoje ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const isTomorrow =
+    d.getFullYear() === tomorrow.getFullYear() &&
+    d.getMonth() === tomorrow.getMonth() &&
+    d.getDate() === tomorrow.getDate();
+  if (isTomorrow) return "amanhã";
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
+}
+
 function parseInputToNumber(raw: string): number {
   if (!raw) return 0;
   // aceita "9997", "9997,50", "9.997,50", "9997.50"
@@ -213,9 +236,45 @@ export default function Card({ card, columnId, onDelete, onUpdateValue }: Props)
         </>
       )}
 
-      {/* Footer hint */}
-      <div className="mt-2 pt-1.5 border-t border-slate-100 text-slate-400 text-[11px]">
-        + Atividade
+      {/* Tarefas */}
+      <div className="mt-2 pt-1.5 border-t border-slate-100">
+        {card.tasks && card.tasks.length > 0 ? (
+          <ul className="space-y-0.5">
+            {card.tasks.map((task) => (
+              <li
+                key={task.id}
+                className="flex items-baseline gap-1.5 text-[11px]"
+                title={task.title}
+              >
+                <span
+                  className={`leading-none shrink-0 ${
+                    task.overdue ? "text-red-500" : "text-slate-400"
+                  }`}
+                >
+                  •
+                </span>
+                <span
+                  className={`flex-1 truncate ${
+                    task.overdue ? "text-red-600 font-medium" : "text-slate-700"
+                  }`}
+                >
+                  {task.title}
+                </span>
+                {task.deadline && (
+                  <span
+                    className={`shrink-0 text-[10px] whitespace-nowrap ${
+                      task.overdue ? "text-red-500" : "text-slate-400"
+                    }`}
+                  >
+                    {formatTaskDeadline(task.deadline)}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-slate-400 text-[11px]">+ Criar tarefa</div>
+        )}
       </div>
     </div>
   );
