@@ -52,13 +52,24 @@ export default function Card({ card, columnId, onDelete }: Props) {
         {card.title}
       </h3>
 
-      {/* Value */}
-      <div className="mt-1.5 text-slate-900 font-semibold text-sm">
-        R$ {card.value.toLocaleString("pt-BR")}
+      {/* Valores R e P (sempre visíveis) */}
+      <div className="mt-1.5 space-y-0.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide">Valor R</span>
+          <span className="text-slate-900 font-semibold text-[13px]">
+            {formatBRL(card.recurring || 0)}
+          </span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide">Valor P</span>
+          <span className="text-slate-900 font-semibold text-[13px]">
+            {formatBRL(card.pontual || 0)}
+          </span>
+        </div>
       </div>
 
       {/* Date */}
-      <div className="text-slate-400 text-[11px] mt-0.5">{card.dateLabel}</div>
+      <div className="text-slate-400 text-[11px] mt-1">{card.dateLabel}</div>
 
       {/* Person responsible */}
       <div className="mt-2 text-[11px] text-slate-500">Pessoa responsável</div>
@@ -72,21 +83,6 @@ export default function Card({ card, columnId, onDelete }: Props) {
       {/* Source */}
       <div className="mt-1.5 text-[11px] text-slate-500">Fonte</div>
       <div className="text-slate-800 text-[13px] truncate">{card.source}</div>
-
-      {/* Values */}
-      {card.pontual !== undefined && (
-        <>
-          <div className="mt-2 text-xs text-slate-500">Valor Pontual</div>
-          <div className="text-slate-800 text-sm">{formatBRL(card.pontual)}</div>
-        </>
-      )}
-
-      {card.recurring !== undefined && (
-        <>
-          <div className="mt-2 text-xs text-slate-500">Valor Recorrente</div>
-          <div className="text-slate-800 text-sm">{formatBRL(card.recurring)}</div>
-        </>
-      )}
 
       {/* SDR */}
       {card.sdr && (

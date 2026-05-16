@@ -42,7 +42,21 @@ type Deal = {
   ASSIGNED_BY_ID: string;
   SOURCE_ID: string;
   DATE_MODIFY: string;
+  [key: string]: any;
 };
+
+// Campos personalizados do Bitrix (Pipeline Commerce — turbopartners)
+const FIELD_VALOR_PONTUAL = "UF_CRM_1752256743002";
+const FIELD_VALOR_RECORRENTE = "UF_CRM_1752256871802";
+
+function parseMoneyField(raw: unknown): number {
+  if (raw == null || raw === "") return 0;
+  const str = String(raw);
+  const pipeIdx = str.indexOf("|");
+  const numStr = pipeIdx >= 0 ? str.slice(0, pipeIdx) : str;
+  const n = parseFloat(numStr);
+  return isNaN(n) ? 0 : n;
+}
 
 type BitrixUser = {
   ID: string;
@@ -108,6 +122,7 @@ export async function GET() {
         select: [
           "ID", "TITLE", "STAGE_ID", "OPPORTUNITY",
           "ASSIGNED_BY_ID", "SOURCE_ID", "DATE_MODIFY",
+          FIELD_VALOR_PONTUAL, FIELD_VALOR_RECORRENTE,
         ],
         order: { DATE_MODIFY: "DESC" },
       }),
@@ -148,15 +163,16 @@ export async function GET() {
     const cards: Record<string, Card> = {};
     for (const d of dealsRaw) {
       const id = `card-${d.ID}`;
-      const value = parseFloat(d.OPPORTUNITY) || 0;
       const card: Card = {
         id,
         bitrixId: d.ID,
         title: d.TITLE || "(sem título)",
-        value,
+        value: parseFloat(d.OPPORTUNITY) || 0,
         dateLabel: dateLabel(d.DATE_MODIFY),
         responsible: userMap.get(d.ASSIGNED_BY_ID) || `Usuário ${d.ASSIGNED_BY_ID}`,
         source: sourceMap.get(d.SOURCE_ID) || d.SOURCE_ID || "—",
+        pontual: parseMoneyField(d[FIELD_VALOR_PONTUAL]),
+        recurring: parseMoneyField(d[FIELD_VALOR_RECORRENTE]),
       };
       cards[id] = card;
       const col = colByStage.get(d.STAGE_ID);
