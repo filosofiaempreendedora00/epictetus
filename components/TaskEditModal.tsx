@@ -29,6 +29,24 @@ function isoToLocalInput(iso: string | null | undefined): string {
   )}:${pad2(d.getMinutes())}`;
 }
 
+function snapTo15Minutes(local: string): string {
+  if (!local) return local;
+  const d = new Date(local);
+  if (isNaN(d.getTime())) return local;
+  const minutes = d.getMinutes();
+  const snapped = Math.round(minutes / 15) * 15;
+  if (snapped >= 60) {
+    d.setHours(d.getHours() + 1);
+    d.setMinutes(0);
+  } else {
+    d.setMinutes(snapped);
+  }
+  d.setSeconds(0, 0);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(
+    d.getHours()
+  )}:${pad2(d.getMinutes())}`;
+}
+
 function localInputToBitrix(local: string): string | null {
   if (!local) return null;
   const d = new Date(local);
@@ -136,7 +154,7 @@ export default function TaskEditModal({
               <input
                 type="datetime-local"
                 value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
+                onChange={(e) => setDeadline(snapTo15Minutes(e.target.value))}
                 disabled={saving}
                 step={900}
                 className="flex-1 text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
