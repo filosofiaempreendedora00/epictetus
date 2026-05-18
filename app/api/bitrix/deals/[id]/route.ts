@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bitrix } from "@/lib/bitrix";
+import { REUNIAO_FIELDS } from "@/lib/reuniaoFields";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,29 @@ export async function PATCH(
     }
     if (Array.isArray(body.servicoIds)) {
       fields[FIELD_SERVICOS_MAPEADOS] = body.servicoIds.map((x: any) => String(x));
+    }
+
+    // Campos da Reunião realizada (15 campos obrigatórios pra avançar de etapa)
+    if (body.reuniaoData && typeof body.reuniaoData === "object") {
+      for (const f of REUNIAO_FIELDS) {
+        const value = body.reuniaoData[f.key];
+        if (value === undefined || value === null) continue;
+        if (f.type === "enum-multi") {
+          if (Array.isArray(value)) {
+            fields[f.bitrixField] = value.map((x: any) => String(x));
+          }
+        } else if (f.type === "datetime") {
+          if (typeof value === "string" && value) {
+            fields[f.bitrixField] = value;
+          }
+        } else {
+          if (typeof value === "string") {
+            fields[f.bitrixField] = value;
+          } else {
+            fields[f.bitrixField] = String(value);
+          }
+        }
+      }
     }
 
     if (Object.keys(fields).length === 0) {

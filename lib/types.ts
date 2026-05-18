@@ -44,6 +44,7 @@ export type BoardState = {
   columns: Column[];
   cards: Record<string, Card>;
   loseFieldOptions?: LoseFieldOptions;
+  reuniaoFieldOptions?: Record<string, EnumOption[]>;
 };
 
 export type TaskCard = {

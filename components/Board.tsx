@@ -20,8 +20,10 @@ import Card from "./Card";
 import Header, { type ViewMode } from "./Header";
 import TasksView from "./TasksView";
 import CongeladoModal from "./CongeladoModal";
+import ReuniaoRealizadaModal from "./ReuniaoRealizadaModal";
 
 const LOSE_STAGE_ID = "LOSE";
+const NEW_STAGE_ID = "NEW";
 
 const EMPTY_STATE: BoardState = { columns: [], cards: {} };
 
@@ -36,6 +38,12 @@ export default function Board() {
   const [pendingCongelado, setPendingCongelado] = useState<{
     cardId: string;
     originColId: string;
+  } | null>(null);
+  const [pendingReuniaoExit, setPendingReuniaoExit] = useState<{
+    cardId: string;
+    originColId: string;
+    targetStageId: string;
+    targetStageName: string;
   } | null>(null);
 
   // Fetch board from Bitrix on mount
@@ -117,12 +125,15 @@ export default function Board() {
       );
 
       // Push the stage change to Bitrix (fire and forget — optimistic UI)
-      // EXCETO se for Congelado: aguardamos o modal preencher os campos
-      // obrigatórios antes de salvar.
+      // EXCETO se for Congelado ou saída de "Reunião realizada":
+      // aguardamos os modais preencherem os campos obrigatórios.
       const card = prev.cards[activeId];
       const targetCol = newColumns.find((c) => c.id === toColId);
+      const fromColStageId = prev.columns.find((c) => c.id === fromColId)?.stageId;
       const isLose = targetCol?.stageId === LOSE_STAGE_ID;
-      if (!isLose && card?.bitrixId && targetCol?.stageId) {
+      const isExitingReuniao =
+        fromColStageId === NEW_STAGE_ID && targetCol?.stageId !== NEW_STAGE_ID;
+      if (!isLose && !isExitingReuniao && card?.bitrixId && targetCol?.stageId) {
         fetch(`/api/bitrix/deals/${card.bitrixId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -153,6 +164,25 @@ export default function Board() {
       origin !== finalColId
     ) {
       setPendingCongelado({ cardId: activeId, originColId: origin });
+      return;
+    }
+
+    // Se o card saiu de "Reunião realizada" (NEW) para outra coluna, abre
+    // o modal com 15 campos obrigatórios
+    const originCol = state.columns.find((c) => c.id === origin);
+    if (
+      originCol?.stageId === NEW_STAGE_ID &&
+      finalCol &&
+      finalCol.stageId !== NEW_STAGE_ID &&
+      origin &&
+      origin !== finalColId
+    ) {
+      setPendingReuniaoExit({
+        cardId: activeId,
+        originColId: origin,
+        targetStageId: finalCol.stageId!,
+        targetStageName: finalCol.title,
+      });
       return;
     }
 
@@ -201,6 +231,17 @@ export default function Board() {
     // Mover para Congelado exige preencher campos obrigatórios → abre modal
     if (newStageId === LOSE_STAGE_ID) {
       setPendingCongelado({ cardId, originColId: fromCol.id });
+      return;
+    }
+
+    // Sair de "Reunião realizada" exige 15 campos obrigatórios → abre modal
+    if (fromCol.stageId === NEW_STAGE_ID && newStageId !== NEW_STAGE_ID) {
+      setPendingReuniaoExit({
+        cardId,
+        originColId: fromCol.id,
+        targetStageId: newStageId,
+        targetStageName: toCol.title,
+      });
       return;
     }
 
@@ -317,6 +358,53 @@ export default function Board() {
       setState((s) => moveCardBetweenColumns(s, cardId, currentColId, originColId));
     }
     setPendingCongelado(null);
+  }
+
+  async function handleConfirmReuniaoExit(reuniaoData: Record<string, any>) {
+    if (!pendingReuniaoExit) return;
+    const { cardId, originColId, targetStageId } = pendingReuniaoExit;
+    const card = state.cards[cardId];
+    if (!card?.bitrixId) return;
+
+    const targetCol = state.columns.find((c) => c.stageId === targetStageId);
+    const currentColId = findColumnIdByCard(cardId);
+    if (targetCol && currentColId && currentColId !== targetCol.id) {
+      setState((s) => moveCardBetweenColumns(s, cardId, currentColId, targetCol.id));
+    }
+
+    try {
+      const res = await fetch(`/api/bitrix/deals/${card.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stageId: targetStageId,
+          reuniaoData,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao salvar no Bitrix");
+      }
+      setPendingReuniaoExit(null);
+    } catch (e: any) {
+      // Rollback: card volta pra coluna de origem
+      const nowColId = findColumnIdByCard(cardId);
+      if (nowColId && nowColId !== originColId) {
+        setState((s) => moveCardBetweenColumns(s, cardId, nowColId, originColId));
+      }
+      setPendingReuniaoExit(null);
+      throw e;
+    }
+  }
+
+  function handleCancelReuniaoExit() {
+    if (!pendingReuniaoExit) return;
+    const { cardId, originColId } = pendingReuniaoExit;
+    const currentColId = findColumnIdByCard(cardId);
+    if (currentColId && currentColId !== originColId) {
+      setState((s) => moveCardBetweenColumns(s, cardId, currentColId, originColId));
+    }
+    setPendingReuniaoExit(null);
   }
 
   async function handleCompleteTask(cardId: string, taskId: string) {
@@ -563,6 +651,16 @@ export default function Board() {
           servicosOptions={state.loseFieldOptions.servicos}
           onCancel={handleCancelCongelado}
           onConfirm={handleConfirmCongelado}
+        />
+      )}
+
+      {pendingReuniaoExit && state.reuniaoFieldOptions && (
+        <ReuniaoRealizadaModal
+          cardTitle={state.cards[pendingReuniaoExit.cardId]?.title || ""}
+          targetStageName={pendingReuniaoExit.targetStageName}
+          fieldOptions={state.reuniaoFieldOptions}
+          onCancel={handleCancelReuniaoExit}
+          onConfirm={handleConfirmReuniaoExit}
         />
       )}
     </>

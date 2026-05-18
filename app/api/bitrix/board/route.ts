@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { bitrix, bitrixListAll } from "@/lib/bitrix";
 import type { BoardState, Card, Column, DealTask, EnumOption } from "@/lib/types";
+import { REUNIAO_FIELDS } from "@/lib/reuniaoFields";
 
 export const dynamic = "force-dynamic";
 
@@ -303,10 +304,26 @@ export async function GET() {
       if (col) col.cardIds.push(id);
     }
 
+    // Carrega opções dos enums da Reunião realizada (paralelo)
+    const enumFieldNames = REUNIAO_FIELDS.filter(
+      (f) => f.type === "enum" || f.type === "enum-multi"
+    ).map((f) => f.bitrixField);
+    const enumOptionsByField = await Promise.all(
+      enumFieldNames.map((fn) => fetchEnumOptions(fn))
+    );
+    const reuniaoFieldOptions: Record<string, EnumOption[]> = {};
+    REUNIAO_FIELDS.forEach((f) => {
+      if (f.type === "enum" || f.type === "enum-multi") {
+        const idx = enumFieldNames.indexOf(f.bitrixField);
+        reuniaoFieldOptions[f.key] = enumOptionsByField[idx] || [];
+      }
+    });
+
     const state: BoardState = {
       columns,
       cards,
       loseFieldOptions: { motivo: motivoOpts, servicos: servicosOpts },
+      reuniaoFieldOptions,
     };
     return NextResponse.json(state);
   } catch (e: any) {
