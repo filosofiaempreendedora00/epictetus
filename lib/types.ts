@@ -22,6 +22,7 @@ export type Card = {
   notifications?: number;
   bitrixId?: string;
   tasks?: DealTask[];
+  phone?: string;
 };
 
 export type Column = {

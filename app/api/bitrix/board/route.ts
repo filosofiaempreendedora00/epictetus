@@ -49,8 +49,31 @@ type Deal = {
   ASSIGNED_BY_ID: string;
   SOURCE_ID: string;
   DATE_MODIFY: string;
+  CONTACT_ID?: string;
   [key: string]: any;
 };
+
+type RawPhoneEntry = { VALUE?: string; VALUE_TYPE?: string };
+type RawContact = { ID: string; PHONE?: RawPhoneEntry[] };
+
+async function fetchPhoneMap(contactIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  for (let i = 0; i < contactIds.length; i += 50) {
+    const chunk = contactIds.slice(i, i + 50);
+    const contacts = await bitrix<RawContact[]>("crm.contact.list", {
+      filter: { ID: chunk },
+      select: ["ID", "PHONE"],
+    });
+    for (const c of contacts || []) {
+      const phones = c.PHONE || [];
+      if (!phones.length) continue;
+      const mobile = phones.find((p) => p.VALUE_TYPE === "MOBILE");
+      const phone = (mobile || phones[0])?.VALUE;
+      if (phone) map.set(String(c.ID), phone);
+    }
+  }
+  return map;
+}
 
 // Campos personalizados do Bitrix (Pipeline Commerce — turbopartners)
 const FIELD_VALOR_PONTUAL = "UF_CRM_1752256743002";
@@ -205,6 +228,7 @@ export async function GET() {
         select: [
           "ID", "TITLE", "STAGE_ID", "OPPORTUNITY",
           "ASSIGNED_BY_ID", "SOURCE_ID", "DATE_MODIFY",
+          "CONTACT_ID",
           FIELD_VALOR_PONTUAL, FIELD_VALOR_RECORRENTE,
         ],
         order: { DATE_MODIFY: "DESC" },
@@ -219,6 +243,16 @@ export async function GET() {
     ]);
 
     const tasksByDealId = groupTasksByDeal(tasksResp);
+
+    // Coleta contatos vinculados aos deals e busca telefones em lote
+    const contactIdSet = new Set<string>();
+    for (const d of dealsRaw) {
+      if (d.CONTACT_ID && d.CONTACT_ID !== "0") contactIdSet.add(d.CONTACT_ID);
+    }
+    const phoneMap =
+      contactIdSet.size > 0
+        ? await fetchPhoneMap(Array.from(contactIdSet))
+        : new Map<string, string>();
 
     const stages = stagesRaw.filter(isStageVisible);
 
@@ -262,6 +296,7 @@ export async function GET() {
         pontual: parseMoneyField(d[FIELD_VALOR_PONTUAL]),
         recurring: parseMoneyField(d[FIELD_VALOR_RECORRENTE]),
         tasks: tasksByDealId.get(d.ID) || [],
+        phone: d.CONTACT_ID ? phoneMap.get(d.CONTACT_ID) : undefined,
       };
       cards[id] = card;
       const col = colByStage.get(d.STAGE_ID);
