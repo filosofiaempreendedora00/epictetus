@@ -330,6 +330,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           initialTitle={editingTask.title}
           initialDescription={editingTask.description}
           initialDeadline={editingTask.deadline}
+          linkedDealName={editingTask.dealName}
           saveLabel="Salvar"
           onClose={() => setEditingTaskId(null)}
           onSave={handleSaveTask}
@@ -638,10 +639,21 @@ function MonthlyTaskItem({
       {...attributes}
       {...listeners}
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      className="block w-full text-left bg-sky-50 border border-sky-100 text-sky-800 hover:bg-sky-100 transition rounded px-1.5 py-0.5 text-[10px] leading-snug break-words cursor-grab active:cursor-grabbing"
-      title={`${task.title} — clique para editar, arraste para mudar o dia`}
+      className="block w-full text-left bg-sky-50 border border-sky-100 hover:bg-sky-100 transition rounded px-1.5 py-1 leading-snug break-words cursor-grab active:cursor-grabbing"
+      title={
+        task.dealName
+          ? `${task.dealName} — ${task.title} — clique para editar, arraste para mudar o dia`
+          : `${task.title} — clique para editar, arraste para mudar o dia`
+      }
     >
-      {task.title}
+      {task.dealName && (
+        <div className="text-[8px] text-sky-600 leading-snug break-words">
+          {task.dealName}
+        </div>
+      )}
+      <div className="text-[10px] text-sky-900 font-medium leading-snug break-words">
+        {task.title}
+      </div>
     </button>
   );
 }

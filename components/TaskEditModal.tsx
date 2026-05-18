@@ -11,6 +11,7 @@ type Props = {
   initialDeadline?: string | null;
   initialDealId?: string | null;
   dealsForSelect?: DealOption[];
+  linkedDealName?: string;
   saveLabel: string;
   onClose: () => void;
   onSave: (fields: {
@@ -216,6 +217,7 @@ export default function TaskEditModal({
   initialDeadline,
   initialDealId,
   dealsForSelect,
+  linkedDealName,
   saveLabel,
   onClose,
   onSave,
@@ -307,7 +309,7 @@ export default function TaskEditModal({
             />
           </div>
 
-          {showDealSelector && (
+          {showDealSelector ? (
             <div>
               <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
                 Negócio do Kanban
@@ -328,7 +330,16 @@ export default function TaskEditModal({
                 ))}
               </select>
             </div>
-          )}
+          ) : linkedDealName ? (
+            <div>
+              <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+                Negócio vinculado
+              </label>
+              <div className="text-sm text-sky-700 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2 break-words">
+                {linkedDealName}
+              </div>
+            </div>
+          ) : null}
 
           <div>
             <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
