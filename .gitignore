@@ -6,3 +6,4 @@ out
 .env*.local
 .env.locacd
 next-env.d.ts
+tsconfig.tsbuildinfo
