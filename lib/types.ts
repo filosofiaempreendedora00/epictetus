@@ -32,9 +32,17 @@ export type Column = {
   stageId?: string;
 };
 
+export type EnumOption = { id: string; value: string };
+
+export type LoseFieldOptions = {
+  motivo: EnumOption[];
+  servicos: EnumOption[];
+};
+
 export type BoardState = {
   columns: Column[];
   cards: Record<string, Card>;
+  loseFieldOptions?: LoseFieldOptions;
 };
 
 export type TaskCard = {

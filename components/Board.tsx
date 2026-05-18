@@ -19,6 +19,9 @@ import Column from "./Column";
 import Card from "./Card";
 import Header, { type ViewMode } from "./Header";
 import TasksView from "./TasksView";
+import CongeladoModal from "./CongeladoModal";
+
+const LOSE_STAGE_ID = "LOSE";
 
 const EMPTY_STATE: BoardState = { columns: [], cards: {} };
 
@@ -29,6 +32,11 @@ export default function Board() {
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("negocios");
+  const [dragOriginColId, setDragOriginColId] = useState<string | null>(null);
+  const [pendingCongelado, setPendingCongelado] = useState<{
+    cardId: string;
+    originColId: string;
+  } | null>(null);
 
   // Fetch board from Bitrix on mount
   useEffect(() => {
@@ -65,6 +73,7 @@ export default function Board() {
   function handleDragStart(event: DragStartEvent) {
     const id = event.active.id as string;
     setActiveCard(state.cards[id] ?? null);
+    setDragOriginColId(findColumnIdByCard(id) ?? null);
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -108,9 +117,12 @@ export default function Board() {
       );
 
       // Push the stage change to Bitrix (fire and forget — optimistic UI)
+      // EXCETO se for Congelado: aguardamos o modal preencher os campos
+      // obrigatórios antes de salvar.
       const card = prev.cards[activeId];
       const targetCol = newColumns.find((c) => c.id === toColId);
-      if (card?.bitrixId && targetCol?.stageId) {
+      const isLose = targetCol?.stageId === LOSE_STAGE_ID;
+      if (!isLose && card?.bitrixId && targetCol?.stageId) {
         fetch(`/api/bitrix/deals/${card.bitrixId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -127,13 +139,28 @@ export default function Board() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveCard(null);
-    if (!over) return;
 
     const activeId = active.id as string;
+    const finalColId = findColumnIdByCard(activeId);
+    const finalCol = state.columns.find((c) => c.id === finalColId);
+    const origin = dragOriginColId;
+    setDragOriginColId(null);
+
+    // Se o card foi parar em Congelado vindo de outra coluna, abre o modal
+    if (
+      finalCol?.stageId === LOSE_STAGE_ID &&
+      origin &&
+      origin !== finalColId
+    ) {
+      setPendingCongelado({ cardId: activeId, originColId: origin });
+      return;
+    }
+
+    if (!over) return;
     const overId = over.id as string;
     if (activeId === overId) return;
 
-    const colId = findColumnIdByCard(activeId);
+    const colId = finalColId;
     if (!colId) return;
 
     const overInSameColumn =
@@ -170,6 +197,12 @@ export default function Board() {
     const fromCol = state.columns.find((c) => c.cardIds.includes(cardId));
     const toCol = state.columns.find((c) => c.stageId === newStageId);
     if (!fromCol || !toCol || fromCol.id === toCol.id) return;
+
+    // Mover para Congelado exige preencher campos obrigatórios → abre modal
+    if (newStageId === LOSE_STAGE_ID) {
+      setPendingCongelado({ cardId, originColId: fromCol.id });
+      return;
+    }
 
     const prevFromIds = fromCol.cardIds;
     const prevToIds = toCol.cardIds;
@@ -208,6 +241,82 @@ export default function Board() {
       }));
       throw e;
     }
+  }
+
+  function moveCardBetweenColumns(
+    s: BoardState,
+    cardId: string,
+    fromColId: string,
+    toColId: string
+  ): BoardState {
+    if (fromColId === toColId) return s;
+    return {
+      ...s,
+      columns: s.columns.map((c) => {
+        if (c.id === fromColId) {
+          return { ...c, cardIds: c.cardIds.filter((id) => id !== cardId) };
+        }
+        if (c.id === toColId) {
+          return { ...c, cardIds: [cardId, ...c.cardIds] };
+        }
+        return c;
+      }),
+    };
+  }
+
+  async function handleConfirmCongelado(fields: {
+    motivoIds: string[];
+    descricao: string;
+    servicoIds: string[];
+  }) {
+    if (!pendingCongelado) return;
+    const { cardId, originColId } = pendingCongelado;
+    const card = state.cards[cardId];
+    if (!card?.bitrixId) return;
+
+    const loseCol = state.columns.find((c) => c.stageId === LOSE_STAGE_ID);
+    const currentColId = findColumnIdByCard(cardId);
+    // Visualmente move pra Congelado se ainda não está lá (caso veio do
+    // DealEditModal/dropdown, em que pulamos o move otimista)
+    if (loseCol && currentColId && currentColId !== loseCol.id) {
+      setState((s) => moveCardBetweenColumns(s, cardId, currentColId, loseCol.id));
+    }
+
+    try {
+      const res = await fetch(`/api/bitrix/deals/${card.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stageId: LOSE_STAGE_ID,
+          motivoIds: fields.motivoIds,
+          descricao: fields.descricao,
+          servicoIds: fields.servicoIds,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao congelar negócio no Bitrix");
+      }
+      setPendingCongelado(null);
+    } catch (e: any) {
+      // Rollback: card volta pra coluna de origem
+      const nowColId = findColumnIdByCard(cardId);
+      if (nowColId && nowColId !== originColId) {
+        setState((s) => moveCardBetweenColumns(s, cardId, nowColId, originColId));
+      }
+      setPendingCongelado(null);
+      throw e;
+    }
+  }
+
+  function handleCancelCongelado() {
+    if (!pendingCongelado) return;
+    const { cardId, originColId } = pendingCongelado;
+    const currentColId = findColumnIdByCard(cardId);
+    if (currentColId && currentColId !== originColId) {
+      setState((s) => moveCardBetweenColumns(s, cardId, currentColId, originColId));
+    }
+    setPendingCongelado(null);
   }
 
   async function handleCompleteTask(cardId: string, taskId: string) {
@@ -445,6 +554,16 @@ export default function Board() {
             ) : null}
           </DragOverlay>
         </DndContext>
+      )}
+
+      {pendingCongelado && state.loseFieldOptions && (
+        <CongeladoModal
+          cardTitle={state.cards[pendingCongelado.cardId]?.title || ""}
+          motivoOptions={state.loseFieldOptions.motivo}
+          servicosOptions={state.loseFieldOptions.servicos}
+          onCancel={handleCancelCongelado}
+          onConfirm={handleConfirmCongelado}
+        />
       )}
     </>
   );

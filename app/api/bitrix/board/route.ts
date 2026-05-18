@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bitrix, bitrixListAll } from "@/lib/bitrix";
-import type { BoardState, Card, Column, DealTask } from "@/lib/types";
+import type { BoardState, Card, Column, DealTask, EnumOption } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +55,20 @@ type Deal = {
 // Campos personalizados do Bitrix (Pipeline Commerce — turbopartners)
 const FIELD_VALOR_PONTUAL = "UF_CRM_1752256743002";
 const FIELD_VALOR_RECORRENTE = "UF_CRM_1752256871802";
+const FIELD_MOTIVO_PERDA = "UF_CRM_1771965137";
+const FIELD_SERVICOS_MAPEADOS = "UF_CRM_1772734873";
+
+async function fetchEnumOptions(fieldName: string): Promise<EnumOption[]> {
+  const fields = await bitrix<any[]>("crm.deal.userfield.list", {
+    filter: { FIELD_NAME: fieldName },
+  });
+  const field = fields?.[0];
+  const list = field?.LIST || [];
+  return list.map((item: any) => ({
+    id: String(item.ID),
+    value: String(item.VALUE),
+  }));
+}
 
 function parseMoneyField(raw: unknown): number {
   if (raw == null || raw === "") return 0;
@@ -173,7 +187,15 @@ export async function GET() {
       ASSIGNED_BY_ID: responsibleId,
     };
 
-    const [stagesRaw, dealsRaw, sourcesRaw, usersRaw, tasksResp] = await Promise.all([
+    const [
+      stagesRaw,
+      dealsRaw,
+      sourcesRaw,
+      usersRaw,
+      tasksResp,
+      motivoOpts,
+      servicosOpts,
+    ] = await Promise.all([
       bitrix<StatusRow[]>("crm.status.list", {
         filter: { ENTITY_ID: "DEAL_STAGE" },
         order: { SORT: "ASC" },
@@ -192,6 +214,8 @@ export async function GET() {
       }),
       bitrix<BitrixUser[]>("user.get", { ACTIVE: true }),
       fetchOpenTasks(),
+      fetchEnumOptions(FIELD_MOTIVO_PERDA),
+      fetchEnumOptions(FIELD_SERVICOS_MAPEADOS),
     ]);
 
     const tasksByDealId = groupTasksByDeal(tasksResp);
@@ -244,7 +268,11 @@ export async function GET() {
       if (col) col.cardIds.push(id);
     }
 
-    const state: BoardState = { columns, cards };
+    const state: BoardState = {
+      columns,
+      cards,
+      loseFieldOptions: { motivo: motivoOpts, servicos: servicosOpts },
+    };
     return NextResponse.json(state);
   } catch (e: any) {
     return NextResponse.json(
