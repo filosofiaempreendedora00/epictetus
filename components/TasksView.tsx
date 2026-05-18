@@ -131,6 +131,32 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     }));
   }
 
+  async function handleCompleteTask() {
+    if (!editingTask) return;
+    const prev = editingTask;
+    setState((s) => {
+      const rest = { ...s.tasks };
+      delete rest[prev.id];
+      return { ...s, tasks: rest };
+    });
+    try {
+      const res = await fetch(
+        `/api/bitrix/tasks/${prev.bitrixId}/complete`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao concluir no Bitrix");
+      }
+    } catch (e: any) {
+      setState((s) => ({
+        ...s,
+        tasks: { ...s.tasks, [prev.id]: prev },
+      }));
+      throw e;
+    }
+  }
+
   async function handleSaveTask(fields: {
     title: string;
     description: string;
@@ -331,9 +357,10 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           initialDescription={editingTask.description}
           initialDeadline={editingTask.deadline}
           linkedDealName={editingTask.dealName}
-          saveLabel="Salvar"
+          saveLabel="Salvar alterações"
           onClose={() => setEditingTaskId(null)}
           onSave={handleSaveTask}
+          onComplete={handleCompleteTask}
         />
       )}
 

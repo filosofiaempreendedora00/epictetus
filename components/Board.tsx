@@ -163,6 +163,41 @@ export default function Board() {
     alert("Exclusão pelo Kanban ficará disponível em breve. Mova ou exclua o negócio no Bitrix.");
   }
 
+  async function handleCompleteTask(cardId: string, taskId: string) {
+    const card = state.cards[cardId];
+    const taskIdx = card?.tasks?.findIndex((t) => t.id === taskId) ?? -1;
+    if (taskIdx < 0 || !card?.tasks) return;
+    const prevTask = card.tasks[taskIdx];
+
+    setState((s) => {
+      const tasks = (s.cards[cardId].tasks || []).filter((t) => t.id !== taskId);
+      return {
+        ...s,
+        cards: { ...s.cards, [cardId]: { ...s.cards[cardId], tasks } },
+      };
+    });
+
+    try {
+      const res = await fetch(`/api/bitrix/tasks/${taskId}/complete`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao concluir no Bitrix");
+      }
+    } catch (e: any) {
+      setState((s) => {
+        const tasks = [...(s.cards[cardId].tasks || [])];
+        tasks.splice(taskIdx, 0, prevTask);
+        return {
+          ...s,
+          cards: { ...s.cards, [cardId]: { ...s.cards[cardId], tasks } },
+        };
+      });
+      throw e;
+    }
+  }
+
   async function handleCreateTask(
     cardId: string,
     fields: { title: string; description: string; deadline?: string | null }
@@ -345,6 +380,7 @@ export default function Board() {
                   onUpdateValue={handleUpdateValue}
                   onUpdateTask={handleUpdateTask}
                   onCreateTask={handleCreateTask}
+                  onCompleteTask={handleCompleteTask}
                 />
               );
             })}

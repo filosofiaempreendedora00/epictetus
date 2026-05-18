@@ -21,6 +21,7 @@ type Props = {
     cardId: string,
     fields: { title: string; description: string; deadline?: string | null }
   ) => Promise<void>;
+  onCompleteTask?: (cardId: string, taskId: string) => Promise<void>;
 };
 
 function pad2(n: number) {
@@ -153,6 +154,7 @@ export default function Card({
   onUpdateValue,
   onUpdateTask,
   onCreateTask,
+  onCompleteTask,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -333,7 +335,7 @@ export default function Card({
           initialTitle={editingTask?.title ?? ""}
           initialDescription={editingTask?.description ?? ""}
           initialDeadline={editingTask?.deadline ?? null}
-          saveLabel={editingTask ? "Salvar" : "Criar"}
+          saveLabel={editingTask ? "Salvar alterações" : "Criar"}
           onClose={() => {
             setEditingTaskId(null);
             setCreatingTask(false);
@@ -345,6 +347,11 @@ export default function Card({
               await onCreateTask(card.id, fields);
             }
           }}
+          onComplete={
+            editingTask && onCompleteTask
+              ? () => onCompleteTask(card.id, editingTask.id)
+              : undefined
+          }
         />
       )}
     </>

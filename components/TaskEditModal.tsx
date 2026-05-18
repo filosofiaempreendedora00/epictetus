@@ -20,6 +20,7 @@ type Props = {
     deadline: string | null;
     dealId?: string;
   }) => Promise<void>;
+  onComplete?: () => Promise<void>;
 };
 
 function pad2(n: number) {
@@ -221,6 +222,7 @@ export default function TaskEditModal({
   saveLabel,
   onClose,
   onSave,
+  onComplete,
 }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
@@ -229,7 +231,9 @@ export default function TaskEditModal({
   );
   const [dealId, setDealId] = useState<string>(initialDealId || "");
   const [saving, setSaving] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const busy = saving || completing;
 
   const { date: dlDate, hour: dlHour, minute: dlMinute } = splitLocal(deadline);
   const showDealSelector = Array.isArray(dealsForSelect);
@@ -268,6 +272,26 @@ export default function TaskEditModal({
     }
   }
 
+  async function handleComplete() {
+    if (!onComplete) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Marcar essa tarefa como concluída?")
+    ) {
+      return;
+    }
+    setCompleting(true);
+    setError(null);
+    try {
+      await onComplete();
+      onClose();
+    } catch (e: any) {
+      setError(e?.message || "Erro ao concluir tarefa");
+    } finally {
+      setCompleting(false);
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
@@ -285,7 +309,7 @@ export default function TaskEditModal({
           <h2 className="text-base font-semibold text-slate-900">{heading}</h2>
           <button
             onClick={onClose}
-            disabled={saving}
+            disabled={busy}
             className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-6 h-6 flex items-center justify-center"
             title="Fechar"
             aria-label="Fechar"
@@ -304,7 +328,7 @@ export default function TaskEditModal({
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              disabled={saving}
+              disabled={busy}
               className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
             />
           </div>
@@ -317,7 +341,7 @@ export default function TaskEditModal({
               <select
                 value={dealId}
                 onChange={(e) => setDealId(e.target.value)}
-                disabled={saving}
+                disabled={busy}
                 className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 bg-white"
               >
                 <option value="" disabled>
@@ -352,7 +376,7 @@ export default function TaskEditModal({
                 onChange={(e) =>
                   setDeadline(joinLocal(e.target.value, dlHour, dlMinute))
                 }
-                disabled={saving}
+                disabled={busy}
                 className="flex-1 text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
               />
               <HourPicker
@@ -370,7 +394,7 @@ export default function TaskEditModal({
                 <button
                   type="button"
                   onClick={() => setDeadline("")}
-                  disabled={saving}
+                  disabled={busy}
                   className="text-[11px] text-slate-500 hover:text-red-600 transition px-2 py-1 rounded shrink-0"
                   title="Limpar prazo"
                 >
@@ -387,7 +411,7 @@ export default function TaskEditModal({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              disabled={saving}
+              disabled={busy}
               rows={6}
               placeholder="Mais detalhes sobre a tarefa…"
               className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 resize-y disabled:bg-slate-50"
@@ -401,21 +425,47 @@ export default function TaskEditModal({
           )}
         </div>
 
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
-          >
-            {saving ? "Salvando…" : saveLabel}
-          </button>
+        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+          {onComplete ? (
+            <button
+              onClick={handleComplete}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition disabled:opacity-50 font-medium"
+              title="Marca a tarefa como concluída no Bitrix e remove daqui"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              {completing ? "Concluindo…" : "Marcar como concluída"}
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2 ml-auto">
+            <button
+              onClick={onClose}
+              disabled={busy}
+              className="px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={busy}
+              className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
+            >
+              {saving ? "Salvando…" : saveLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>
