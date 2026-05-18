@@ -229,11 +229,11 @@ export default function Card({
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={handleCopyPhone}
-            className="absolute top-1.5 right-2 opacity-40 hover:opacity-100 text-[#25D366] hover:text-[#1ebe5d] transition"
+            className="absolute top-1.5 right-2 opacity-75 hover:opacity-100 text-[#25D366] hover:text-[#1ebe5d] transition"
             title={`Copiar telefone (${card.phone})`}
             aria-label="Copiar telefone para WhatsApp"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.6 6.32A7.85 7.85 0 0 0 12 4a7.94 7.94 0 0 0-6.87 11.93L4 20l4.2-1.1A7.94 7.94 0 0 0 12 19.94a7.94 7.94 0 0 0 7.94-7.94 7.85 7.85 0 0 0-2.34-5.68Zm-5.6 12.22a6.6 6.6 0 0 1-3.36-.92l-.24-.14-2.49.65.67-2.43-.16-.25a6.59 6.59 0 1 1 12.24-3.48 6.6 6.6 0 0 1-6.66 6.57Zm3.62-4.92c-.2-.1-1.18-.58-1.36-.65s-.31-.1-.45.1-.51.65-.62.78-.23.15-.43.05a5.4 5.4 0 0 1-1.6-1 6 6 0 0 1-1.1-1.37c-.12-.2 0-.3.09-.4l.3-.35a1.4 1.4 0 0 0 .2-.34.36.36 0 0 0 0-.35c-.05-.1-.45-1.08-.62-1.48s-.33-.34-.45-.34h-.4a.78.78 0 0 0-.56.26 2.36 2.36 0 0 0-.73 1.75A4.1 4.1 0 0 0 8.43 13a9.34 9.34 0 0 0 3.57 3.17 12.2 12.2 0 0 0 1.2.44 2.9 2.9 0 0 0 1.32.08 2.15 2.15 0 0 0 1.41-1 1.74 1.74 0 0 0 .13-1c-.05-.08-.18-.13-.38-.23Z" />
             </svg>
           </button>
@@ -248,7 +248,7 @@ export default function Card({
               onDelete();
             }}
             className={`absolute top-1.5 ${
-              card.phone ? "right-7" : "right-2"
+              card.phone ? "right-8" : "right-2"
             } opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500 text-xs`}
             title="Excluir"
           >
@@ -259,7 +259,7 @@ export default function Card({
         {/* Title */}
         <h3
           className={`text-slate-900 font-medium leading-snug text-[12px] ${
-            card.phone ? "pr-6" : ""
+            card.phone ? "pr-7" : ""
           }`}
         >
           {card.title}
