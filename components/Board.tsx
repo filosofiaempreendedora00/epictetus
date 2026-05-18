@@ -163,6 +163,53 @@ export default function Board() {
     alert("Exclusão pelo Kanban ficará disponível em breve. Mova ou exclua o negócio no Bitrix.");
   }
 
+  async function handleChangeStage(cardId: string, newStageId: string) {
+    const card = state.cards[cardId];
+    if (!card?.bitrixId) return;
+
+    const fromCol = state.columns.find((c) => c.cardIds.includes(cardId));
+    const toCol = state.columns.find((c) => c.stageId === newStageId);
+    if (!fromCol || !toCol || fromCol.id === toCol.id) return;
+
+    const prevFromIds = fromCol.cardIds;
+    const prevToIds = toCol.cardIds;
+
+    setState((s) => ({
+      ...s,
+      columns: s.columns.map((c) => {
+        if (c.id === fromCol.id) {
+          return { ...c, cardIds: c.cardIds.filter((id) => id !== cardId) };
+        }
+        if (c.id === toCol.id) {
+          return { ...c, cardIds: [cardId, ...c.cardIds] };
+        }
+        return c;
+      }),
+    }));
+
+    try {
+      const res = await fetch(`/api/bitrix/deals/${card.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stageId: newStageId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao mudar a fase no Bitrix");
+      }
+    } catch (e: any) {
+      setState((s) => ({
+        ...s,
+        columns: s.columns.map((c) => {
+          if (c.id === fromCol.id) return { ...c, cardIds: prevFromIds };
+          if (c.id === toCol.id) return { ...c, cardIds: prevToIds };
+          return c;
+        }),
+      }));
+      throw e;
+    }
+  }
+
   async function handleCompleteTask(cardId: string, taskId: string) {
     const card = state.cards[cardId];
     const taskIdx = card?.tasks?.findIndex((t) => t.id === taskId) ?? -1;
@@ -381,6 +428,10 @@ export default function Board() {
                   onUpdateTask={handleUpdateTask}
                   onCreateTask={handleCreateTask}
                   onCompleteTask={handleCompleteTask}
+                  allStages={state.columns
+                    .filter((c) => c.stageId)
+                    .map((c) => ({ stageId: c.stageId!, title: c.title }))}
+                  onChangeStage={handleChangeStage}
                 />
               );
             })}

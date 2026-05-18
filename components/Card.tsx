@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Card as CardType } from "@/lib/types";
 import { formatBRL } from "@/lib/initialData";
 import TaskEditModal from "./TaskEditModal";
+import DealEditModal from "./DealEditModal";
 
 type Props = {
   card: CardType;
@@ -22,6 +23,9 @@ type Props = {
     fields: { title: string; description: string; deadline?: string | null }
   ) => Promise<void>;
   onCompleteTask?: (cardId: string, taskId: string) => Promise<void>;
+  allStages?: Array<{ stageId: string; title: string }>;
+  currentStageId?: string;
+  onChangeStage?: (cardId: string, newStageId: string) => Promise<void>;
 };
 
 function pad2(n: number) {
@@ -100,6 +104,7 @@ function MoneyRow({
           value={draft}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -155,6 +160,9 @@ export default function Card({
   onUpdateTask,
   onCreateTask,
   onCompleteTask,
+  allStages,
+  currentStageId,
+  onChangeStage,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -164,6 +172,7 @@ export default function Card({
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [editingDeal, setEditingDeal] = useState(false);
   const editingTask = card.tasks?.find((t) => t.id === editingTaskId) || null;
   const showModal = !!editingTask || creatingTask;
 
@@ -180,7 +189,16 @@ export default function Card({
         style={style}
         {...attributes}
         {...listeners}
-        className="group bg-white rounded-xl shadow-sm px-3 py-2.5 cursor-grab active:cursor-grabbing relative overflow-hidden"
+        onClick={(e) => {
+          if (!onChangeStage || !allStages?.length) return;
+          // ignora cliques originados em elementos filhos interativos
+          // (cada um já chama stopPropagation, mas guardamos por segurança)
+          if ((e.target as HTMLElement).closest("button, input, textarea, select, a, [contenteditable='true']")) {
+            return;
+          }
+          setEditingDeal(true);
+        }}
+        className="group bg-white rounded-xl shadow-sm px-3 py-2.5 cursor-grab active:cursor-grabbing relative overflow-hidden hover:shadow-md transition"
       >
         {/* Delete (visible on hover) */}
         {onDelete && (
@@ -352,6 +370,16 @@ export default function Card({
               ? () => onCompleteTask(card.id, editingTask.id)
               : undefined
           }
+        />
+      )}
+
+      {editingDeal && allStages && onChangeStage && (
+        <DealEditModal
+          cardTitle={card.title}
+          currentStageId={currentStageId}
+          stages={allStages}
+          onClose={() => setEditingDeal(false)}
+          onSave={(newStageId) => onChangeStage(card.id, newStageId)}
         />
       )}
     </>

@@ -16,6 +16,8 @@ type Props = {
   onUpdateTask?: (cardId: string, taskId: string, fields: { title?: string; description?: string; deadline?: string | null }) => Promise<void>;
   onCreateTask?: (cardId: string, fields: { title: string; description: string; deadline?: string | null }) => Promise<void>;
   onCompleteTask?: (cardId: string, taskId: string) => Promise<void>;
+  allStages?: Array<{ stageId: string; title: string }>;
+  onChangeStage?: (cardId: string, newStageId: string) => Promise<void>;
 };
 
 export default function Column({
@@ -29,6 +31,8 @@ export default function Column({
   onUpdateTask,
   onCreateTask,
   onCompleteTask,
+  allStages,
+  onChangeStage,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -96,6 +100,9 @@ export default function Column({
               onUpdateTask={onUpdateTask}
               onCreateTask={onCreateTask}
               onCompleteTask={onCompleteTask}
+              allStages={allStages}
+              currentStageId={column.stageId}
+              onChangeStage={onChangeStage}
             />
           ))}
         </SortableContext>
