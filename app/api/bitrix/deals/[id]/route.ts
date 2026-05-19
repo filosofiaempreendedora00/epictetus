@@ -9,6 +9,7 @@ const FIELD_VALOR_RECORRENTE = "UF_CRM_1752256871802";
 const FIELD_MOTIVO_PERDA = "UF_CRM_1771965137";
 const FIELD_DESCRICAO_PERDA = "UF_CRM_1753447633";
 const FIELD_SERVICOS_MAPEADOS = "UF_CRM_1772734873";
+const FIELD_PROPOSAL_LINK = "UF_CRM_1758580725895";
 
 export async function PATCH(
   req: Request,
@@ -35,6 +36,9 @@ export async function PATCH(
     }
     if (Array.isArray(body.servicoIds)) {
       fields[FIELD_SERVICOS_MAPEADOS] = body.servicoIds.map((x: any) => String(x));
+    }
+    if (typeof body.proposalLink === "string") {
+      fields[FIELD_PROPOSAL_LINK] = body.proposalLink.trim();
     }
 
     // Campos da Reunião realizada (15 campos obrigatórios pra avançar de etapa)

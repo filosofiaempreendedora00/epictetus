@@ -16,6 +16,7 @@ type Props = {
   onUpdateTask?: (cardId: string, taskId: string, fields: { title?: string; description?: string; deadline?: string | null }) => Promise<void>;
   onCreateTask?: (cardId: string, fields: { title: string; description: string; deadline?: string | null }) => Promise<void>;
   onCompleteTask?: (cardId: string, taskId: string) => Promise<void>;
+  onUpdateProposalLink?: (cardId: string, link: string) => Promise<void>;
   allStages?: Array<{ stageId: string; title: string }>;
   onChangeStage?: (cardId: string, newStageId: string) => Promise<void>;
 };
@@ -31,6 +32,7 @@ export default function Column({
   onUpdateTask,
   onCreateTask,
   onCompleteTask,
+  onUpdateProposalLink,
   allStages,
   onChangeStage,
 }: Props) {
@@ -100,6 +102,7 @@ export default function Column({
               onUpdateTask={onUpdateTask}
               onCreateTask={onCreateTask}
               onCompleteTask={onCompleteTask}
+              onUpdateProposalLink={onUpdateProposalLink}
               allStages={allStages}
               currentStageId={column.stageId}
               onChangeStage={onChangeStage}

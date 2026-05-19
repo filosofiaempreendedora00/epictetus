@@ -81,6 +81,9 @@ const FIELD_VALOR_PONTUAL = "UF_CRM_1752256743002";
 const FIELD_VALOR_RECORRENTE = "UF_CRM_1752256871802";
 const FIELD_MOTIVO_PERDA = "UF_CRM_1771965137";
 const FIELD_SERVICOS_MAPEADOS = "UF_CRM_1772734873";
+// Campo URL genérico que vamos usar pra "Link da proposta".
+// Se preferir criar um dedicado no Bitrix, basta trocar esse ID.
+const FIELD_PROPOSAL_LINK = "UF_CRM_1758580725895";
 
 async function fetchEnumOptions(fieldName: string): Promise<EnumOption[]> {
   const fields = await bitrix<any[]>("crm.deal.userfield.list", {
@@ -231,6 +234,7 @@ export async function GET() {
           "ASSIGNED_BY_ID", "SOURCE_ID", "DATE_MODIFY",
           "CONTACT_ID",
           FIELD_VALOR_PONTUAL, FIELD_VALOR_RECORRENTE,
+          FIELD_PROPOSAL_LINK,
         ],
         order: { DATE_MODIFY: "DESC" },
       }),
@@ -298,6 +302,9 @@ export async function GET() {
         recurring: parseMoneyField(d[FIELD_VALOR_RECORRENTE]),
         tasks: tasksByDealId.get(d.ID) || [],
         phone: d.CONTACT_ID ? phoneMap.get(d.CONTACT_ID) : undefined,
+        proposalLink: typeof d[FIELD_PROPOSAL_LINK] === "string"
+          ? String(d[FIELD_PROPOSAL_LINK]).trim() || undefined
+          : undefined,
       };
       cards[id] = card;
       const col = colByStage.get(d.STAGE_ID);

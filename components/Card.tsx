@@ -23,6 +23,7 @@ type Props = {
     fields: { title: string; description: string; deadline?: string | null }
   ) => Promise<void>;
   onCompleteTask?: (cardId: string, taskId: string) => Promise<void>;
+  onUpdateProposalLink?: (cardId: string, link: string) => Promise<void>;
   allStages?: Array<{ stageId: string; title: string }>;
   currentStageId?: string;
   onChangeStage?: (cardId: string, newStageId: string) => Promise<void>;
@@ -160,6 +161,7 @@ export default function Card({
   onUpdateTask,
   onCreateTask,
   onCompleteTask,
+  onUpdateProposalLink,
   allStages,
   currentStageId,
   onChangeStage,
@@ -174,8 +176,24 @@ export default function Card({
   const [creatingTask, setCreatingTask] = useState(false);
   const [editingDeal, setEditingDeal] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
+  const [editingProposal, setEditingProposal] = useState(false);
+  const [proposalDraft, setProposalDraft] = useState("");
   const editingTask = card.tasks?.find((t) => t.id === editingTaskId) || null;
   const showModal = !!editingTask || creatingTask;
+
+  function startEditProposal(e: React.MouseEvent) {
+    e.stopPropagation();
+    setProposalDraft(card.proposalLink || "");
+    setEditingProposal(true);
+  }
+
+  async function commitProposal() {
+    const trimmed = proposalDraft.trim();
+    setEditingProposal(false);
+    if (onUpdateProposalLink && trimmed !== (card.proposalLink || "")) {
+      await onUpdateProposalLink(card.id, trimmed);
+    }
+  }
 
   async function handleCopyPhone(e: React.MouseEvent) {
     e.stopPropagation();
@@ -325,6 +343,81 @@ export default function Card({
               {card.taskStatus}
             </span>
           </>
+        )}
+
+        {/* Link da proposta */}
+        {onUpdateProposalLink && (
+          <div className="mt-2 pt-1.5 border-t border-slate-100">
+            {editingProposal ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-500 text-[10px] uppercase tracking-wide font-medium shrink-0">
+                  Proposta
+                </span>
+                <input
+                  autoFocus
+                  type="url"
+                  value={proposalDraft}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setProposalDraft(e.target.value)}
+                  onBlur={commitProposal}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitProposal();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setEditingProposal(false);
+                    }
+                  }}
+                  placeholder="https://…"
+                  className="flex-1 min-w-0 text-[11px] px-1.5 py-0.5 border border-sky-400 rounded outline-none text-slate-900"
+                />
+              </div>
+            ) : card.proposalLink ? (
+              <div className="flex items-center gap-1.5 group/p">
+                <span className="text-slate-500 text-[10px] uppercase tracking-wide font-medium shrink-0">
+                  Proposta
+                </span>
+                <a
+                  href={card.proposalLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 min-w-0 truncate text-[11px] text-sky-600 hover:text-sky-800 underline"
+                  title={card.proposalLink}
+                >
+                  {card.proposalLink}
+                </a>
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={startEditProposal}
+                  className="opacity-30 hover:opacity-100 transition text-slate-500 hover:text-sky-600 shrink-0"
+                  title="Editar link"
+                  aria-label="Editar link da proposta"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={startEditProposal}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-slate-200 text-slate-400 hover:text-sky-600 hover:border-sky-300 transition text-[11px]"
+                title="Adicionar link da proposta"
+              >
+                <span className="leading-none">+</span>
+                <span>Link da proposta</span>
+              </button>
+            )}
+          </div>
         )}
 
         {/* Tarefas */}

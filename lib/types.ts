@@ -23,6 +23,7 @@ export type Card = {
   bitrixId?: string;
   tasks?: DealTask[];
   phone?: string;
+  proposalLink?: string;
 };
 
 export type Column = {

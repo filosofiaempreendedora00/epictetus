@@ -527,6 +527,43 @@ export default function Board() {
     }
   }
 
+  async function handleUpdateProposalLink(cardId: string, link: string) {
+    const current = state.cards[cardId];
+    if (!current?.bitrixId) return;
+    const prev = current.proposalLink ?? "";
+    const next = link.trim();
+    if (prev === next) return;
+
+    setState((s) => ({
+      ...s,
+      cards: {
+        ...s.cards,
+        [cardId]: { ...s.cards[cardId], proposalLink: next || undefined },
+      },
+    }));
+
+    try {
+      const res = await fetch(`/api/bitrix/deals/${current.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposalLink: next }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao salvar link");
+      }
+    } catch (e: any) {
+      setState((s) => ({
+        ...s,
+        cards: {
+          ...s.cards,
+          [cardId]: { ...s.cards[cardId], proposalLink: prev || undefined },
+        },
+      }));
+      alert(`Erro ao salvar link da proposta: ${e?.message || ""}`);
+    }
+  }
+
   async function handleUpdateValue(
     cardId: string,
     field: "pontual" | "recurring",
@@ -625,6 +662,7 @@ export default function Board() {
                   onUpdateTask={handleUpdateTask}
                   onCreateTask={handleCreateTask}
                   onCompleteTask={handleCompleteTask}
+                  onUpdateProposalLink={handleUpdateProposalLink}
                   allStages={state.columns
                     .filter((c) => c.stageId)
                     .map((c) => ({ stageId: c.stageId!, title: c.title }))}
