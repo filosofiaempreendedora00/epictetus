@@ -195,6 +195,22 @@ export default function Card({
     }
   }
 
+  function ensureProtocol(url: string): string {
+    const t = url.trim();
+    if (!t) return "";
+    if (/^(https?:|mailto:|tel:)/i.test(t)) return t;
+    return `https://${t}`;
+  }
+
+  function openProposalLink(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = ensureProtocol(card.proposalLink || "");
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }
+
   async function handleCopyPhone(e: React.MouseEvent) {
     e.stopPropagation();
     if (!card.phone) return;
@@ -381,13 +397,13 @@ export default function Card({
                   Proposta
                 </span>
                 <a
-                  href={card.proposalLink}
+                  href={ensureProtocol(card.proposalLink)}
                   target="_blank"
                   rel="noopener noreferrer"
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 min-w-0 truncate text-[11px] text-sky-600 hover:text-sky-800 underline"
+                  onClick={openProposalLink}
+                  className="flex-1 min-w-0 truncate text-[11px] text-sky-600 hover:text-sky-800 underline cursor-pointer"
                   title={card.proposalLink}
                 >
                   {card.proposalLink}
