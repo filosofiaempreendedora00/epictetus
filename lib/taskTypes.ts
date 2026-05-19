@@ -16,16 +16,21 @@ export const TASK_TYPE_INFO: Record<
 
 // Paleta de cores por tipo. Classes Tailwind escritas inteiras pro JIT detectar.
 export type TaskTypeColors = {
+  // Para chips/cards (fundo claro sobre cards brancos)
   bg: string;
   border: string;
   hover: string;
   dot: string;
   title: string;
   deadline: string;
-  // Para pills sólidos (filtro ativo, badge sólido)
+  // Para pills do filtro quando ATIVO (cor sólida, sobre fundo escuro)
   solidBg: string;
   solidBorder: string;
   solidText: string;
+  // Para pills do filtro quando INATIVO (translúcido, mas mantendo identidade)
+  fadedBg: string;
+  fadedBorder: string;
+  fadedText: string;
 };
 
 export const TASK_TYPE_COLORS: Record<TaskType, TaskTypeColors> = {
@@ -39,6 +44,9 @@ export const TASK_TYPE_COLORS: Record<TaskType, TaskTypeColors> = {
     solidBg: "bg-sky-500",
     solidBorder: "border-sky-500",
     solidText: "text-white",
+    fadedBg: "bg-sky-500/15",
+    fadedBorder: "border-sky-400/40",
+    fadedText: "text-sky-300",
   },
   R2R3: {
     bg: "bg-violet-50",
@@ -50,6 +58,9 @@ export const TASK_TYPE_COLORS: Record<TaskType, TaskTypeColors> = {
     solidBg: "bg-violet-500",
     solidBorder: "border-violet-500",
     solidText: "text-white",
+    fadedBg: "bg-violet-500/15",
+    fadedBorder: "border-violet-400/40",
+    fadedText: "text-violet-300",
   },
   PROPOSTA: {
     bg: "bg-emerald-50",
@@ -61,17 +72,23 @@ export const TASK_TYPE_COLORS: Record<TaskType, TaskTypeColors> = {
     solidBg: "bg-emerald-500",
     solidBorder: "border-emerald-500",
     solidText: "text-white",
+    fadedBg: "bg-emerald-500/15",
+    fadedBorder: "border-emerald-400/40",
+    fadedText: "text-emerald-300",
   },
   OUTRO: {
-    bg: "bg-slate-50",
-    border: "border-slate-200",
-    hover: "hover:bg-slate-100/70",
-    dot: "bg-slate-500",
-    title: "text-slate-700",
-    deadline: "text-slate-500",
-    solidBg: "bg-slate-500",
-    solidBorder: "border-slate-500",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    hover: "hover:bg-amber-100/70",
+    dot: "bg-amber-500",
+    title: "text-amber-800",
+    deadline: "text-amber-600",
+    solidBg: "bg-amber-500",
+    solidBorder: "border-amber-500",
     solidText: "text-white",
+    fadedBg: "bg-amber-500/15",
+    fadedBorder: "border-amber-400/40",
+    fadedText: "text-amber-300",
   },
 };
 

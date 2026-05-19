@@ -339,8 +339,8 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           onClick={() => setTypeFilter("ALL")}
           className={`text-[12px] px-3 py-1 rounded-full border transition ${
             typeFilter === "ALL"
-              ? "bg-sky-500 border-sky-500 text-white"
-              : "bg-white/[0.04] border-white/15 text-white/70 hover:text-white hover:border-white/30"
+              ? "bg-white text-slate-900 border-white"
+              : "bg-white/10 text-white/80 border-white/30 hover:bg-white/15 hover:text-white"
           }`}
         >
           Todas as tarefas{" "}
@@ -357,7 +357,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
               className={`text-[12px] px-3 py-1 rounded-full border transition ${
                 active
                   ? `${colors.solidBg} ${colors.solidBorder} ${colors.solidText}`
-                  : "bg-white/[0.04] border-white/15 text-white/70 hover:text-white hover:border-white/30"
+                  : `${colors.fadedBg} ${colors.fadedBorder} ${colors.fadedText} hover:brightness-125`
               }`}
             >
               {TASK_TYPE_INFO[t].label}{" "}
