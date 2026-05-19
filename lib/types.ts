@@ -48,6 +48,8 @@ export type BoardState = {
   reuniaoFieldOptions?: Record<string, EnumOption[]>;
 };
 
+import type { TaskType } from "./taskTypes";
+
 export type TaskCard = {
   id: string;
   bitrixId: string;
@@ -56,6 +58,7 @@ export type TaskCard = {
   deadline: string | null;
   dealId?: string;
   dealName?: string;
+  type: TaskType;
 };
 
 export type TasksBoardState = {

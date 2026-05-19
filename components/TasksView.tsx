@@ -13,6 +13,12 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import type { TasksBoardState, TaskCard } from "@/lib/types";
+import {
+  TASK_TYPE_INFO,
+  TASK_TYPE_ORDER,
+  inferTaskType,
+  type TaskType,
+} from "@/lib/taskTypes";
 import TaskEditModal from "./TaskEditModal";
 
 const EMPTY: TasksBoardState = { tasks: {} };
@@ -79,6 +85,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<TaskType | "ALL">("ALL");
 
   const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
   const draggedTask = draggedTaskId ? state.tasks[draggedTaskId] : null;
@@ -124,6 +131,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
       deadline: created.deadline,
       dealId: fields.dealId,
       dealName,
+      type: inferTaskType(created.title),
     };
     setState((s) => ({
       ...s,
@@ -268,6 +276,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     const q = searchTerm.trim().toLowerCase();
     for (const t of Object.values(state.tasks)) {
       if (!t.deadline) continue;
+      if (typeFilter !== "ALL" && t.type !== typeFilter) continue;
       if (q) {
         const matches =
           t.title.toLowerCase().includes(q) ||
@@ -284,7 +293,24 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
       arr.sort((a, b) => (a.deadline || "").localeCompare(b.deadline || ""));
     }
     return m;
-  }, [state.tasks, searchTerm]);
+  }, [state.tasks, searchTerm, typeFilter]);
+
+  // Contagem por tipo (pra exibir nos botões)
+  const countByType = useMemo(() => {
+    const counts: Record<TaskType | "ALL", number> = {
+      ALL: 0,
+      FUP: 0,
+      R2R3: 0,
+      PROPOSTA: 0,
+      OUTRO: 0,
+    };
+    for (const t of Object.values(state.tasks)) {
+      if (!t.deadline) continue;
+      counts.ALL++;
+      counts[t.type]++;
+    }
+    return counts;
+  }, [state.tasks]);
 
   if (loading) {
     return (
@@ -305,6 +331,37 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
 
   return (
     <div className="px-6 pb-6">
+      {/* Filtro por tipo */}
+      <div className="mb-2 flex items-center gap-1.5 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setTypeFilter("ALL")}
+          className={`text-[12px] px-3 py-1 rounded-full border transition ${
+            typeFilter === "ALL"
+              ? "bg-sky-500 border-sky-500 text-white"
+              : "bg-white/[0.04] border-white/15 text-white/70 hover:text-white hover:border-white/30"
+          }`}
+        >
+          Todas as tarefas{" "}
+          <span className="opacity-70">({countByType.ALL})</span>
+        </button>
+        {TASK_TYPE_ORDER.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTypeFilter(t)}
+            className={`text-[12px] px-3 py-1 rounded-full border transition ${
+              typeFilter === t
+                ? "bg-sky-500 border-sky-500 text-white"
+                : "bg-white/[0.04] border-white/15 text-white/70 hover:text-white hover:border-white/30"
+            }`}
+          >
+            {TASK_TYPE_INFO[t].label}{" "}
+            <span className="opacity-70">({countByType[t]})</span>
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
         <DateViewSwitcher value={dateView} onChange={setDateView} />
         <button
@@ -371,6 +428,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           initialDescription=""
           initialDeadline={null}
           dealsForSelect={state.deals || []}
+          showTypeSelector
           saveLabel="Criar"
           onClose={() => setCreatingTask(false)}
           onSave={handleCreateTask}

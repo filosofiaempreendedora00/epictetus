@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { bitrix, bitrixListAll } from "@/lib/bitrix";
 import type { DealTask, TaskCard, TasksBoardState } from "@/lib/types";
+import { inferTaskType } from "@/lib/taskTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,7 @@ export async function GET() {
         deadline: t.deadline || null,
         dealId,
         dealName: dealId ? dealMap.get(dealId) : undefined,
+        type: inferTaskType(t.title),
       };
     }
 

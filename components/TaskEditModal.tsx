@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  TASK_TYPE_INFO,
+  TASK_TYPE_ORDER,
+  buildTitleWithType,
+  type TaskType,
+} from "@/lib/taskTypes";
 
 type DealOption = { id: string; name: string };
 
@@ -12,6 +18,7 @@ type Props = {
   initialDealId?: string | null;
   dealsForSelect?: DealOption[];
   linkedDealName?: string;
+  showTypeSelector?: boolean;
   saveLabel: string;
   onClose: () => void;
   onSave: (fields: {
@@ -219,6 +226,7 @@ export default function TaskEditModal({
   initialDealId,
   dealsForSelect,
   linkedDealName,
+  showTypeSelector,
   saveLabel,
   onClose,
   onSave,
@@ -230,6 +238,9 @@ export default function TaskEditModal({
     snapTo15Minutes(isoToLocalInput(initialDeadline))
   );
   const [dealId, setDealId] = useState<string>(initialDealId || "");
+  const [taskType, setTaskType] = useState<TaskType | "">(
+    showTypeSelector ? "" : "OUTRO"
+  );
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -255,11 +266,19 @@ export default function TaskEditModal({
       setError("Selecione o negócio do Kanban");
       return;
     }
+    if (showTypeSelector && !taskType) {
+      setError("Selecione o tipo da tarefa");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
+      const finalTitle =
+        showTypeSelector && taskType
+          ? buildTitleWithType(taskType as TaskType, title)
+          : title.trim();
       await onSave({
-        title: title.trim(),
+        title: finalTitle,
         description,
         deadline: deadline ? localInputToBitrix(deadline) : null,
         ...(showDealSelector ? { dealId } : {}),
@@ -331,7 +350,43 @@ export default function TaskEditModal({
               disabled={busy}
               className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
             />
+            {showTypeSelector && taskType && TASK_TYPE_INFO[taskType as TaskType].prefix && (
+              <div className="text-[10px] text-slate-400 mt-1">
+                Será salva como:{" "}
+                <span className="text-slate-600 font-medium">
+                  {buildTitleWithType(taskType as TaskType, title || "...")}
+                </span>
+              </div>
+            )}
           </div>
+
+          {showTypeSelector && (
+            <div>
+              <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1.5">
+                Tipo da tarefa <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {TASK_TYPE_ORDER.map((t) => {
+                  const selected = taskType === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTaskType(t)}
+                      disabled={busy}
+                      className={`text-[12px] px-3 py-1 rounded-full border transition ${
+                        selected
+                          ? "bg-sky-500 border-sky-500 text-white"
+                          : "bg-white border-slate-200 text-slate-700 hover:border-sky-300"
+                      } disabled:opacity-50`}
+                    >
+                      {TASK_TYPE_INFO[t].label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {showDealSelector ? (
             <div>
