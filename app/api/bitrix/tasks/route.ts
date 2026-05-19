@@ -148,12 +148,14 @@ export async function POST(req: Request) {
 
     const t = result?.task || {};
     const finalDeadline = t.deadline ?? deadline ?? null;
+    const finalTitle = t.title ?? title;
     const newTask: DealTask = {
       id: String(t.id ?? ""),
-      title: t.title ?? title,
+      title: finalTitle,
       description: t.description ?? description,
       deadline: finalDeadline,
       overdue: finalDeadline ? new Date(finalDeadline).getTime() < Date.now() : false,
+      type: inferTaskType(finalTitle),
     };
 
     return NextResponse.json(newTask);

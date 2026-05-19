@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { bitrix, bitrixListAll } from "@/lib/bitrix";
 import type { BoardState, Card, Column, DealTask, EnumOption } from "@/lib/types";
 import { REUNIAO_FIELDS } from "@/lib/reuniaoFields";
+import { inferTaskType } from "@/lib/taskTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -152,6 +153,7 @@ function groupTasksByDeal(tasks: RawTask[]): Map<string, DealTask[]> {
         description: t.description || "",
         deadline: t.deadline || null,
         overdue,
+        type: inferTaskType(t.title),
       };
       if (!map.has(dealId)) map.set(dealId, []);
       map.get(dealId)!.push(task);

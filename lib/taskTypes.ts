@@ -14,6 +14,67 @@ export const TASK_TYPE_INFO: Record<
   OUTRO: { label: "Outro", prefix: "" },
 };
 
+// Paleta de cores por tipo. Classes Tailwind escritas inteiras pro JIT detectar.
+export type TaskTypeColors = {
+  bg: string;
+  border: string;
+  hover: string;
+  dot: string;
+  title: string;
+  deadline: string;
+  // Para pills sólidos (filtro ativo, badge sólido)
+  solidBg: string;
+  solidBorder: string;
+  solidText: string;
+};
+
+export const TASK_TYPE_COLORS: Record<TaskType, TaskTypeColors> = {
+  FUP: {
+    bg: "bg-sky-50",
+    border: "border-sky-200",
+    hover: "hover:bg-sky-100/70",
+    dot: "bg-sky-500",
+    title: "text-sky-800",
+    deadline: "text-sky-600",
+    solidBg: "bg-sky-500",
+    solidBorder: "border-sky-500",
+    solidText: "text-white",
+  },
+  R2R3: {
+    bg: "bg-violet-50",
+    border: "border-violet-200",
+    hover: "hover:bg-violet-100/70",
+    dot: "bg-violet-500",
+    title: "text-violet-800",
+    deadline: "text-violet-600",
+    solidBg: "bg-violet-500",
+    solidBorder: "border-violet-500",
+    solidText: "text-white",
+  },
+  PROPOSTA: {
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    hover: "hover:bg-emerald-100/70",
+    dot: "bg-emerald-500",
+    title: "text-emerald-800",
+    deadline: "text-emerald-600",
+    solidBg: "bg-emerald-500",
+    solidBorder: "border-emerald-500",
+    solidText: "text-white",
+  },
+  OUTRO: {
+    bg: "bg-slate-50",
+    border: "border-slate-200",
+    hover: "hover:bg-slate-100/70",
+    dot: "bg-slate-500",
+    title: "text-slate-700",
+    deadline: "text-slate-500",
+    solidBg: "bg-slate-500",
+    solidBorder: "border-slate-500",
+    solidText: "text-white",
+  },
+};
+
 export const TASK_TYPE_ORDER: TaskType[] = [
   "FUP",
   "R2R3",

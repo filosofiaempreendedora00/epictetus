@@ -6,6 +6,7 @@ export type DealTask = {
   description?: string;
   deadline: string | null;
   overdue: boolean;
+  type: TaskType;
 };
 
 export type Card = {

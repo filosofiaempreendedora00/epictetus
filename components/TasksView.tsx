@@ -14,6 +14,7 @@ import {
 } from "@dnd-kit/core";
 import type { TasksBoardState, TaskCard } from "@/lib/types";
 import {
+  TASK_TYPE_COLORS,
   TASK_TYPE_INFO,
   TASK_TYPE_ORDER,
   inferTaskType,
@@ -345,21 +346,25 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           Todas as tarefas{" "}
           <span className="opacity-70">({countByType.ALL})</span>
         </button>
-        {TASK_TYPE_ORDER.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTypeFilter(t)}
-            className={`text-[12px] px-3 py-1 rounded-full border transition ${
-              typeFilter === t
-                ? "bg-sky-500 border-sky-500 text-white"
-                : "bg-white/[0.04] border-white/15 text-white/70 hover:text-white hover:border-white/30"
-            }`}
-          >
-            {TASK_TYPE_INFO[t].label}{" "}
-            <span className="opacity-70">({countByType[t]})</span>
-          </button>
-        ))}
+        {TASK_TYPE_ORDER.map((t) => {
+          const colors = TASK_TYPE_COLORS[t];
+          const active = typeFilter === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTypeFilter(t)}
+              className={`text-[12px] px-3 py-1 rounded-full border transition ${
+                active
+                  ? `${colors.solidBg} ${colors.solidBorder} ${colors.solidText}`
+                  : "bg-white/[0.04] border-white/15 text-white/70 hover:text-white hover:border-white/30"
+              }`}
+            >
+              {TASK_TYPE_INFO[t].label}{" "}
+              <span className="opacity-70">({countByType[t]})</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
@@ -683,6 +688,7 @@ function TaskMiniCard({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
   });
+  const colors = TASK_TYPE_COLORS[task.type];
   return (
     <button
       ref={setNodeRef}
@@ -691,15 +697,15 @@ function TaskMiniCard({
       {...attributes}
       {...listeners}
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      className="w-full text-left bg-white rounded-md shadow-sm px-2 py-1.5 hover:shadow-md hover:bg-slate-50 transition cursor-grab active:cursor-grabbing"
+      className={`w-full text-left rounded-md shadow-sm px-2 py-1.5 hover:shadow-md transition cursor-grab active:cursor-grabbing border ${colors.bg} ${colors.border} ${colors.hover}`}
       title={`${task.title} — clique para editar, arraste para mudar o dia`}
     >
       {task.dealName && (
-        <div className="text-[9px] text-sky-600 leading-snug break-words">
+        <div className={`text-[9px] leading-snug break-words ${colors.deadline}`}>
           {task.dealName}
         </div>
       )}
-      <div className="text-slate-900 text-[11px] font-medium leading-snug break-words">
+      <div className={`text-[11px] font-medium leading-snug break-words ${colors.title}`}>
         {task.title}
       </div>
     </button>
@@ -716,6 +722,7 @@ function MonthlyTaskItem({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
   });
+  const colors = TASK_TYPE_COLORS[task.type];
   return (
     <button
       ref={setNodeRef}
@@ -724,7 +731,7 @@ function MonthlyTaskItem({
       {...attributes}
       {...listeners}
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      className="block w-full text-left bg-sky-50 border border-sky-100 hover:bg-sky-100 transition rounded px-1.5 py-1 leading-snug break-words cursor-grab active:cursor-grabbing"
+      className={`block w-full text-left transition rounded px-1.5 py-1 leading-snug break-words cursor-grab active:cursor-grabbing border ${colors.bg} ${colors.border} ${colors.hover}`}
       title={
         task.dealName
           ? `${task.dealName} — ${task.title} — clique para editar, arraste para mudar o dia`
@@ -732,11 +739,11 @@ function MonthlyTaskItem({
       }
     >
       {task.dealName && (
-        <div className="text-[8px] text-sky-600 leading-snug break-words">
+        <div className={`text-[8px] leading-snug break-words ${colors.deadline}`}>
           {task.dealName}
         </div>
       )}
-      <div className="text-[10px] text-sky-900 font-medium leading-snug break-words">
+      <div className={`text-[10px] font-medium leading-snug break-words ${colors.title}`}>
         {task.title}
       </div>
     </button>

@@ -7,6 +7,7 @@ import type { Card as CardType } from "@/lib/types";
 import { formatBRL } from "@/lib/initialData";
 import TaskEditModal from "./TaskEditModal";
 import DealEditModal from "./DealEditModal";
+import { TASK_TYPE_COLORS } from "@/lib/taskTypes";
 
 type Props = {
   card: CardType;
@@ -440,45 +441,44 @@ export default function Card({
         <div className="mt-2 pt-1.5 border-t border-slate-100 space-y-1">
           {card.tasks && card.tasks.length > 0 && (
             <ul className="space-y-1">
-              {card.tasks.map((task) => (
-                <li
-                  key={task.id}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingTaskId(task.id);
-                  }}
-                  className={`flex items-start gap-1.5 px-2 py-1 rounded-md border text-[11px] cursor-pointer transition hover:shadow-sm ${
-                    task.overdue
-                      ? "bg-red-50 border-red-100 hover:bg-red-100/70"
-                      : "bg-sky-50 border-sky-100 hover:bg-sky-100/70"
-                  }`}
-                  title="Clique para editar"
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full shrink-0 mt-[5px] ${
-                      task.overdue ? "bg-red-500" : "bg-sky-500"
+              {card.tasks.map((task) => {
+                const colors = TASK_TYPE_COLORS[task.type];
+                return (
+                  <li
+                    key={task.id}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTaskId(task.id);
+                    }}
+                    className={`flex items-start gap-1.5 px-2 py-1 rounded-md border text-[11px] cursor-pointer transition hover:shadow-sm ${
+                      colors.bg
+                    } ${colors.hover} ${
+                      task.overdue ? "border-red-300" : colors.border
                     }`}
-                  />
-                  <span
-                    className={`flex-1 break-words font-medium leading-snug ${
-                      task.overdue ? "text-red-700" : "text-sky-800"
-                    }`}
+                    title="Clique para editar"
                   >
-                    {task.title}
-                  </span>
-                  {task.deadline && (
                     <span
-                      className={`shrink-0 text-[10px] whitespace-nowrap mt-[1px] ${
-                        task.overdue ? "text-red-500" : "text-sky-600"
-                      }`}
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 mt-[5px] ${colors.dot}`}
+                    />
+                    <span
+                      className={`flex-1 break-words font-medium leading-snug ${colors.title}`}
                     >
-                      {formatTaskDeadline(task.deadline)}
+                      {task.title}
                     </span>
-                  )}
-                </li>
-              ))}
+                    {task.deadline && (
+                      <span
+                        className={`shrink-0 text-[10px] whitespace-nowrap mt-[1px] ${
+                          task.overdue ? "text-red-500 font-medium" : colors.deadline
+                        }`}
+                      >
+                        {formatTaskDeadline(task.deadline)}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
 
