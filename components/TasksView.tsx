@@ -332,23 +332,12 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
 
   return (
     <div className="px-6 pb-6">
-      {/* Filtro por tipo */}
+      {/* Filtro por tipo (estilo neutro — a cor fica nos cards) */}
       <div className="mb-2 flex items-center gap-1.5 flex-wrap">
-        <button
-          type="button"
-          onClick={() => setTypeFilter("ALL")}
-          className={`text-[12px] px-3 py-1 rounded-full border transition ${
-            typeFilter === "ALL"
-              ? "bg-white text-slate-900 border-white"
-              : "bg-white/10 text-white/80 border-white/30 hover:bg-white/15 hover:text-white"
-          }`}
-        >
-          Todas as tarefas{" "}
-          <span className="opacity-70">({countByType.ALL})</span>
-        </button>
-        {TASK_TYPE_ORDER.map((t) => {
-          const colors = TASK_TYPE_COLORS[t];
+        {(["ALL", ...TASK_TYPE_ORDER] as const).map((t) => {
           const active = typeFilter === t;
+          const label =
+            t === "ALL" ? "Todas as tarefas" : TASK_TYPE_INFO[t].label;
           return (
             <button
               key={t}
@@ -356,12 +345,12 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
               onClick={() => setTypeFilter(t)}
               className={`text-[12px] px-3 py-1 rounded-full border transition ${
                 active
-                  ? `${colors.solidBg} ${colors.solidBorder} ${colors.solidText}`
-                  : `${colors.fadedBg} ${colors.fadedBorder} ${colors.fadedText} hover:brightness-125`
+                  ? "bg-white text-slate-900 border-white font-medium"
+                  : "bg-white/[0.06] text-white/70 border-white/15 hover:bg-white/[0.12] hover:text-white"
               }`}
             >
-              {TASK_TYPE_INFO[t].label}{" "}
-              <span className="opacity-70">({countByType[t]})</span>
+              {label}{" "}
+              <span className="opacity-60">({countByType[t]})</span>
             </button>
           );
         })}
