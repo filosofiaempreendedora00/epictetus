@@ -86,6 +86,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [creatingForDate, setCreatingForDate] = useState<Date | null>(null);
   const [typeFilter, setTypeFilter] = useState<TaskType | "ALL">("ALL");
 
   const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
@@ -382,6 +383,10 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
             tasksByDay={tasksByDay}
             days={dateView === "weekly" ? 7 : 14}
             onTaskClick={setEditingTaskId}
+            onCreateTaskForDay={(d) => {
+              setCreatingForDate(d);
+              setCreatingTask(true);
+            }}
           />
         )}
 
@@ -420,10 +425,21 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           heading="Nova tarefa"
           initialTitle=""
           initialDescription=""
-          initialDeadline={null}
+          initialDeadline={
+            creatingForDate
+              ? (() => {
+                  const d = new Date(creatingForDate);
+                  d.setHours(19, 0, 0, 0);
+                  return dateToBitrixISO(d);
+                })()
+              : null
+          }
           dealsForSelect={state.deals || []}
           saveLabel="Criar"
-          onClose={() => setCreatingTask(false)}
+          onClose={() => {
+            setCreatingTask(false);
+            setCreatingForDate(null);
+          }}
           onSave={handleCreateTask}
         />
       )}
@@ -466,10 +482,12 @@ function DayColumnsView({
   tasksByDay,
   days,
   onTaskClick,
+  onCreateTaskForDay,
 }: {
   tasksByDay: Map<string, TaskCard[]>;
   days: number;
   onTaskClick: (taskId: string) => void;
+  onCreateTaskForDay?: (date: Date) => void;
 }) {
   const now = new Date();
   const start = startOfWeekSunday(now);
@@ -512,6 +530,7 @@ function DayColumnsView({
             isToday={isSameDay(d, now)}
             tasks={tasksByDay.get(dayKey(d)) || []}
             onTaskClick={onTaskClick}
+            onCreateTaskForDay={onCreateTaskForDay}
           />
         ))}
       </div>
@@ -524,11 +543,13 @@ function DroppableDayColumn({
   isToday,
   tasks,
   onTaskClick,
+  onCreateTaskForDay,
 }: {
   date: Date;
   isToday: boolean;
   tasks: TaskCard[];
   onTaskClick: (taskId: string) => void;
+  onCreateTaskForDay?: (date: Date) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dayKey(date) });
   return (
@@ -543,7 +564,7 @@ function DroppableDayColumn({
       }`}
       style={{ maxHeight: "calc(100vh - 280px)" }}
     >
-      {tasks.length === 0 && (
+      {tasks.length === 0 && !onCreateTaskForDay && (
         <div className="text-center text-white/15 text-[10px] py-4 select-none">
           —
         </div>
@@ -551,6 +572,16 @@ function DroppableDayColumn({
       {tasks.map((t) => (
         <TaskMiniCard key={t.id} task={t} onClick={() => onTaskClick(t.id)} />
       ))}
+      {onCreateTaskForDay && (
+        <button
+          type="button"
+          onClick={() => onCreateTaskForDay(date)}
+          className="w-full flex items-center justify-center py-1.5 rounded-md border border-dashed border-white/15 text-white/40 hover:text-white/90 hover:border-white/40 hover:bg-white/[0.04] transition text-[13px] leading-none"
+          title="Nova tarefa neste dia"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }
