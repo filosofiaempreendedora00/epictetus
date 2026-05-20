@@ -120,3 +120,19 @@ export function buildTitleWithType(type: TaskType, raw: string): string {
   if (inferTaskType(trimmed) === type) return trimmed;
   return prefix + trimmed;
 }
+
+/**
+ * Remove o prefixo conhecido (FUP, R2, R3, Criar proposta/Proposta)
+ * do início do título. Mantém o restante intacto.
+ */
+export function stripTypePrefix(title: string): string {
+  if (!title) return "";
+  const t = title.trim();
+  const stripped = t
+    .replace(/^FUP[\s\-:p\/]+/i, "")
+    .replace(/^R[23][\s\-:]+/i, "")
+    .replace(/^(criar\s+proposta|proposta)[\s\-:]+/i, "")
+    .trim();
+  // Se nada foi removido OU se sobrou vazio, devolve o original
+  return stripped && stripped !== t ? stripped : t;
+}

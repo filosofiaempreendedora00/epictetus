@@ -507,7 +507,6 @@ export default function Card({
           initialTitle={editingTask?.title ?? ""}
           initialDescription={editingTask?.description ?? ""}
           initialDeadline={editingTask?.deadline ?? null}
-          showTypeSelector={creatingTask && !editingTask}
           saveLabel={editingTask ? "Salvar alterações" : "Criar"}
           onClose={() => {
             setEditingTaskId(null);

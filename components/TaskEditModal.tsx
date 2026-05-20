@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  TASK_TYPE_COLORS,
   TASK_TYPE_INFO,
   TASK_TYPE_ORDER,
-  buildTitleWithType,
+  inferTaskType,
+  stripTypePrefix,
   type TaskType,
 } from "@/lib/taskTypes";
 
@@ -18,7 +20,6 @@ type Props = {
   initialDealId?: string | null;
   dealsForSelect?: DealOption[];
   linkedDealName?: string;
-  showTypeSelector?: boolean;
   saveLabel: string;
   onClose: () => void;
   onSave: (fields: {
@@ -226,20 +227,23 @@ export default function TaskEditModal({
   initialDealId,
   dealsForSelect,
   linkedDealName,
-  showTypeSelector,
   saveLabel,
   onClose,
   onSave,
   onComplete,
 }: Props) {
-  const [title, setTitle] = useState(initialTitle);
+  // Detecta o tipo inferido do título original (vazio em criação)
+  const inferredOriginalType = initialTitle ? inferTaskType(initialTitle) : "";
+  const originalWasR3 = !!initialTitle && /^R3\b/i.test(initialTitle.trim());
+
+  const [title, setTitle] = useState(stripTypePrefix(initialTitle));
   const [description, setDescription] = useState(initialDescription);
   const [deadline, setDeadline] = useState(() =>
     snapTo15Minutes(isoToLocalInput(initialDeadline))
   );
   const [dealId, setDealId] = useState<string>(initialDealId || "");
   const [taskType, setTaskType] = useState<TaskType | "">(
-    showTypeSelector ? "" : "OUTRO"
+    inferredOriginalType || ""
   );
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -266,17 +270,19 @@ export default function TaskEditModal({
       setError("Selecione o negócio do Kanban");
       return;
     }
-    if (showTypeSelector && !taskType) {
+    if (!taskType) {
       setError("Selecione o tipo da tarefa");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      const finalTitle =
-        showTypeSelector && taskType
-          ? buildTitleWithType(taskType as TaskType, title)
-          : title.trim();
+      // Monta o prefixo: caso especial pra preservar R3 quando o original era R3
+      const t = taskType as TaskType;
+      let prefix = TASK_TYPE_INFO[t].prefix;
+      if (t === "R2R3" && originalWasR3) prefix = "R3 - ";
+      const cleanTitle = title.trim();
+      const finalTitle = prefix && cleanTitle ? prefix + cleanTitle : cleanTitle;
       await onSave({
         title: finalTitle,
         description,
@@ -350,43 +356,49 @@ export default function TaskEditModal({
               disabled={busy}
               className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
             />
-            {showTypeSelector && taskType && TASK_TYPE_INFO[taskType as TaskType].prefix && (
+            {taskType && TASK_TYPE_INFO[taskType as TaskType].prefix && (
               <div className="text-[10px] text-slate-400 mt-1">
                 Será salva como:{" "}
                 <span className="text-slate-600 font-medium">
-                  {buildTitleWithType(taskType as TaskType, title || "...")}
+                  {(() => {
+                    const t = taskType as TaskType;
+                    const pre =
+                      t === "R2R3" && originalWasR3
+                        ? "R3 - "
+                        : TASK_TYPE_INFO[t].prefix;
+                    return pre + (title.trim() || "...");
+                  })()}
                 </span>
               </div>
             )}
           </div>
 
-          {showTypeSelector && (
-            <div>
-              <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1.5">
-                Tipo da tarefa <span className="text-red-500">*</span>
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {TASK_TYPE_ORDER.map((t) => {
-                  const selected = taskType === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTaskType(t)}
-                      disabled={busy}
-                      className={`text-[12px] px-3 py-1 rounded-full border transition ${
-                        selected
-                          ? "bg-sky-500 border-sky-500 text-white"
-                          : "bg-white border-slate-200 text-slate-700 hover:border-sky-300"
-                      } disabled:opacity-50`}
-                    >
-                      {TASK_TYPE_INFO[t].label}
-                    </button>
-                  );
-                })}
-              </div>
+          <div>
+            <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1.5">
+              Tipo da tarefa <span className="text-red-500">*</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {TASK_TYPE_ORDER.map((t) => {
+                const selected = taskType === t;
+                const colors = TASK_TYPE_COLORS[t];
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTaskType(t)}
+                    disabled={busy}
+                    className={`text-[12px] px-3 py-1 rounded-full border transition ${
+                      selected
+                        ? `${colors.solidBg} ${colors.solidBorder} ${colors.solidText}`
+                        : `bg-white ${colors.border} ${colors.title} hover:${colors.bg}`
+                    } disabled:opacity-50`}
+                  >
+                    {TASK_TYPE_INFO[t].label}
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
 
           {showDealSelector ? (
             <div>

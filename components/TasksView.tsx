@@ -422,7 +422,6 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           initialDescription=""
           initialDeadline={null}
           dealsForSelect={state.deals || []}
-          showTypeSelector
           saveLabel="Criar"
           onClose={() => setCreatingTask(false)}
           onSave={handleCreateTask}
