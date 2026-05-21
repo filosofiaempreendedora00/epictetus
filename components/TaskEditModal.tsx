@@ -153,6 +153,155 @@ function HourPicker({
   );
 }
 
+function DealCombobox({
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  options: DealOption[];
+  onChange: (id: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(() => {
+    const sel = options.find((o) => o.id === value);
+    return sel ? sel.name : "";
+  });
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sincroniza query quando value muda externamente (ex: pré-seleção via prop)
+  useEffect(() => {
+    const sel = options.find((o) => o.id === value);
+    setQuery(sel ? sel.name : "");
+  }, [value, options]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        // Restaura query se ficou divergente do selecionado
+        const sel = options.find((o) => o.id === value);
+        setQuery(sel ? sel.name : "");
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        const sel = options.find((o) => o.id === value);
+        setQuery(sel ? sel.name : "");
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, value, options]);
+
+  const selectedName = options.find((o) => o.id === value)?.name;
+  const q = query.trim().toLowerCase();
+  const showAll = !q || q === (selectedName?.toLowerCase() ?? "");
+  const filtered = showAll
+    ? options
+    : options.filter((o) => o.name.toLowerCase().includes(q));
+
+  function handleSelect(id: string, name: string) {
+    onChange(id);
+    setQuery(name);
+    setOpen(false);
+  }
+
+  function handleClear(e: React.MouseEvent) {
+    e.stopPropagation();
+    onChange("");
+    setQuery("");
+    setOpen(true);
+    inputRef.current?.focus();
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <svg
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="M21 21l-4.35-4.35" />
+        </svg>
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          disabled={disabled}
+          placeholder="Buscar negócio…"
+          className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg pl-9 pr-9 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
+        />
+        {value && !disabled && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition w-5 h-5 flex items-center justify-center"
+            title="Limpar"
+            aria-label="Limpar"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute z-10 top-full mt-1 w-full max-h-64 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-3 text-slate-400 text-sm">
+              Nenhum negócio encontrado
+            </div>
+          ) : (
+            <>
+              {filtered.slice(0, 50).map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => handleSelect(o.id, o.name)}
+                  className={`block w-full text-left px-3 py-2 text-sm transition ${
+                    o.id === value
+                      ? "bg-sky-100 text-sky-800 font-medium"
+                      : "text-slate-700 hover:bg-sky-50"
+                  }`}
+                >
+                  {o.name}
+                </button>
+              ))}
+              {filtered.length > 50 && (
+                <div className="px-3 py-1.5 text-[11px] text-slate-400 border-t border-slate-100">
+                  Mostrando 50 de {filtered.length} — refine a busca
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MinutePicker({
   value,
   onChange,
@@ -405,21 +554,12 @@ export default function TaskEditModal({
               <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
                 Negócio do Kanban
               </label>
-              <select
+              <DealCombobox
                 value={dealId}
-                onChange={(e) => setDealId(e.target.value)}
+                options={dealsForSelect || []}
+                onChange={setDealId}
                 disabled={busy}
-                className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 bg-white"
-              >
-                <option value="" disabled>
-                  Selecione um negócio…
-                </option>
-                {(dealsForSelect || []).map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           ) : linkedDealName ? (
             <div>
