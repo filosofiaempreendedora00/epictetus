@@ -87,6 +87,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
   const [creatingForDate, setCreatingForDate] = useState<Date | null>(null);
+  const [creatingForDealId, setCreatingForDealId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TaskType | "ALL">("ALL");
 
   const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
@@ -158,6 +159,11 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || "Falha ao concluir no Bitrix");
       }
+      // Após concluir com sucesso, encadeia abertura do modal de criação
+      // de uma nova tarefa com o mesmo negócio já pré-selecionado.
+      setEditingTaskId(null);
+      if (prev.dealId) setCreatingForDealId(prev.dealId);
+      setCreatingTask(true);
     } catch (e: any) {
       setState((s) => ({
         ...s,
@@ -434,11 +440,13 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
                 })()
               : null
           }
+          initialDealId={creatingForDealId}
           dealsForSelect={state.deals || []}
           saveLabel="Criar"
           onClose={() => {
             setCreatingTask(false);
             setCreatingForDate(null);
+            setCreatingForDealId(null);
           }}
           onSave={handleCreateTask}
         />
