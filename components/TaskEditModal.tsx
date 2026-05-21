@@ -63,9 +63,9 @@ function snapTo15Minutes(local: string): string {
 }
 
 function splitLocal(local: string): { date: string; hour: number; minute: number } {
-  if (!local) return { date: "", hour: 9, minute: 0 };
+  if (!local) return { date: "", hour: 20, minute: 0 };
   const [date, time] = local.split("T");
-  const [h, m] = (time || "09:00").split(":").map((v) => parseInt(v, 10) || 0);
+  const [h, m] = (time || "20:00").split(":").map((v) => parseInt(v, 10) || 0);
   return { date: date || "", hour: h, minute: m };
 }
 

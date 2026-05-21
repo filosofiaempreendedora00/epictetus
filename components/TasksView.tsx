@@ -429,7 +429,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
             creatingForDate
               ? (() => {
                   const d = new Date(creatingForDate);
-                  d.setHours(19, 0, 0, 0);
+                  d.setHours(20, 0, 0, 0);
                   return dateToBitrixISO(d);
                 })()
               : null
