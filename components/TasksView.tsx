@@ -89,6 +89,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [creatingForDate, setCreatingForDate] = useState<Date | null>(null);
   const [creatingForDealId, setCreatingForDealId] = useState<string | null>(null);
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+  const [weekOffset, setWeekOffset] = useState(0); // semanas a partir da semana atual
 
   async function handleCopyPhone(phone: string) {
     if (!phone) return;
@@ -418,6 +419,8 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           <DayColumnsView
             tasksByDay={tasksByDay}
             days={dateView === "weekly" ? 7 : 14}
+            weekOffset={weekOffset}
+            onWeekOffsetChange={setWeekOffset}
             onTaskClick={setEditingTaskId}
             onCreateTaskForDay={(d) => {
               setCreatingForDate(d);
@@ -539,22 +542,98 @@ function DateViewSwitcher({
 function DayColumnsView({
   tasksByDay,
   days,
+  weekOffset,
+  onWeekOffsetChange,
   onTaskClick,
   onCreateTaskForDay,
   onCopyPhone,
 }: {
   tasksByDay: Map<string, TaskCard[]>;
   days: number;
+  weekOffset: number;
+  onWeekOffsetChange: (offset: number) => void;
   onTaskClick: (taskId: string) => void;
   onCreateTaskForDay?: (date: Date) => void;
   onCopyPhone?: (phone: string) => void;
 }) {
   const now = new Date();
-  const start = startOfWeekSunday(now);
+  const start = addDays(startOfWeekSunday(now), weekOffset * 7);
   const dayList = Array.from({ length: days }, (_, i) => addDays(start, i));
+  const lastDay = dayList[dayList.length - 1];
+  const weekSpan = days === 7 ? 1 : 2; // quantas semanas o botão "<" / ">" pula
+
+  function formatRange(a: Date, b: Date) {
+    const sameMonth = a.getMonth() === b.getMonth();
+    const sameYear = a.getFullYear() === b.getFullYear();
+    if (sameMonth && sameYear) {
+      return `${a.getDate()} – ${b.getDate()} de ${PT_MONTH_LONG[a.getMonth()]} ${a.getFullYear()}`;
+    }
+    if (sameYear) {
+      return `${a.getDate()} ${PT_MONTH_LONG[a.getMonth()]} – ${b.getDate()} ${PT_MONTH_LONG[b.getMonth()]} ${a.getFullYear()}`;
+    }
+    return `${a.getDate()} ${PT_MONTH_LONG[a.getMonth()]} ${a.getFullYear()} – ${b.getDate()} ${PT_MONTH_LONG[b.getMonth()]} ${b.getFullYear()}`;
+  }
 
   return (
-    <div className="border-t border-white/10">
+    <div>
+      {/* Barra de navegação de semanas */}
+      <div className="flex items-center gap-2 mb-2">
+        <button
+          type="button"
+          onClick={() => onWeekOffsetChange(weekOffset - weekSpan)}
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
+          title="Semana anterior"
+          aria-label="Semana anterior"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={() => onWeekOffsetChange(weekOffset + weekSpan)}
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
+          title="Próxima semana"
+          aria-label="Próxima semana"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+        <div className="text-white/80 text-[13px] font-medium">
+          {formatRange(start, lastDay)}
+        </div>
+        {weekOffset !== 0 && (
+          <button
+            type="button"
+            onClick={() => onWeekOffsetChange(0)}
+            className="ml-2 text-[12px] px-2 py-1 rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
+            title="Voltar pra semana atual"
+          >
+            Hoje
+          </button>
+        )}
+      </div>
+
+      <div className="border-t border-white/10">
       {/* Cabeçalho de dias */}
       <div className="flex">
         {dayList.map((d) => {
@@ -594,6 +673,7 @@ function DayColumnsView({
             onCopyPhone={onCopyPhone}
           />
         ))}
+      </div>
       </div>
     </div>
   );
