@@ -59,6 +59,7 @@ export type TaskCard = {
   deadline: string | null;
   dealId?: string;
   dealName?: string;
+  phone?: string;
   type: TaskType;
 };
 

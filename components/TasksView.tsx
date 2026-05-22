@@ -88,6 +88,26 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [creatingTask, setCreatingTask] = useState(false);
   const [creatingForDate, setCreatingForDate] = useState<Date | null>(null);
   const [creatingForDealId, setCreatingForDealId] = useState<string | null>(null);
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+
+  async function handleCopyPhone(phone: string) {
+    if (!phone) return;
+    try {
+      await navigator.clipboard.writeText(phone);
+    } catch {
+      // Fallback pra contextos sem permissão de clipboard
+      const ta = document.createElement("textarea");
+      ta.value = phone;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch {}
+      document.body.removeChild(ta);
+    }
+    setCopiedPhone(phone);
+    window.setTimeout(() => setCopiedPhone(null), 2200);
+  }
   const [typeFilter, setTypeFilter] = useState<TaskType | "ALL">("ALL");
 
   const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
@@ -383,6 +403,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           <MonthlyView
             tasksByDay={tasksByDay}
             onTaskClick={setEditingTaskId}
+            onCopyPhone={handleCopyPhone}
           />
         ) : (
           <DayColumnsView
@@ -393,6 +414,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
               setCreatingForDate(d);
               setCreatingTask(true);
             }}
+            onCopyPhone={handleCopyPhone}
           />
         )}
 
@@ -451,6 +473,25 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           onSave={handleCreateTask}
         />
       )}
+
+      {copiedPhone && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[60] bg-slate-900 text-white text-sm px-4 py-2 rounded-lg shadow-2xl flex items-center gap-2 pointer-events-none">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-emerald-400"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>Número copiado: {copiedPhone}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -491,11 +532,13 @@ function DayColumnsView({
   days,
   onTaskClick,
   onCreateTaskForDay,
+  onCopyPhone,
 }: {
   tasksByDay: Map<string, TaskCard[]>;
   days: number;
   onTaskClick: (taskId: string) => void;
   onCreateTaskForDay?: (date: Date) => void;
+  onCopyPhone?: (phone: string) => void;
 }) {
   const now = new Date();
   const start = startOfWeekSunday(now);
@@ -539,6 +582,7 @@ function DayColumnsView({
             tasks={tasksByDay.get(dayKey(d)) || []}
             onTaskClick={onTaskClick}
             onCreateTaskForDay={onCreateTaskForDay}
+            onCopyPhone={onCopyPhone}
           />
         ))}
       </div>
@@ -552,12 +596,14 @@ function DroppableDayColumn({
   tasks,
   onTaskClick,
   onCreateTaskForDay,
+  onCopyPhone,
 }: {
   date: Date;
   isToday: boolean;
   tasks: TaskCard[];
   onTaskClick: (taskId: string) => void;
   onCreateTaskForDay?: (date: Date) => void;
+  onCopyPhone?: (phone: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dayKey(date) });
   return (
@@ -578,7 +624,12 @@ function DroppableDayColumn({
         </div>
       )}
       {tasks.map((t) => (
-        <TaskMiniCard key={t.id} task={t} onClick={() => onTaskClick(t.id)} />
+        <TaskMiniCard
+          key={t.id}
+          task={t}
+          onClick={() => onTaskClick(t.id)}
+          onCopyPhone={onCopyPhone}
+        />
       ))}
       {onCreateTaskForDay && (
         <button
@@ -597,9 +648,11 @@ function DroppableDayColumn({
 function MonthlyView({
   tasksByDay,
   onTaskClick,
+  onCopyPhone,
 }: {
   tasksByDay: Map<string, TaskCard[]>;
   onTaskClick: (taskId: string) => void;
+  onCopyPhone?: (phone: string) => void;
 }) {
   const now = new Date();
   const year = now.getFullYear();
@@ -638,6 +691,7 @@ function MonthlyView({
             isToday={isSameDay(d, now)}
             tasks={tasksByDay.get(dayKey(d)) || []}
             onTaskClick={onTaskClick}
+            onCopyPhone={onCopyPhone}
           />
         ))}
       </div>
@@ -651,12 +705,14 @@ function DroppableMonthCell({
   isToday,
   tasks,
   onTaskClick,
+  onCopyPhone,
 }: {
   date: Date;
   inMonth: boolean;
   isToday: boolean;
   tasks: TaskCard[];
   onTaskClick: (taskId: string) => void;
+  onCopyPhone?: (phone: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dayKey(date) });
   return (
@@ -693,6 +749,7 @@ function DroppableMonthCell({
             key={t.id}
             task={t}
             onClick={() => onTaskClick(t.id)}
+            onCopyPhone={onCopyPhone}
           />
         ))}
         {tasks.length > 3 && (
@@ -708,71 +765,153 @@ function DroppableMonthCell({
 function TaskMiniCard({
   task,
   onClick,
+  onCopyPhone,
 }: {
   task: TaskCard;
   onClick: () => void;
+  onCopyPhone?: (phone: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
   });
   const colors = TASK_TYPE_COLORS[task.type];
   return (
-    <button
+    <div
       ref={setNodeRef}
-      type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        if (
+          (e.target as HTMLElement).closest(
+            "button, a, input, textarea, select"
+          )
+        )
+          return;
+        onClick();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       {...attributes}
       {...listeners}
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      className={`w-full text-left rounded-md shadow-sm px-2 py-1.5 hover:shadow-md transition cursor-grab active:cursor-grabbing border ${colors.bg} ${colors.border} ${colors.hover}`}
+      className={`relative w-full text-left rounded-md shadow-sm px-2 py-1.5 hover:shadow-md transition cursor-grab active:cursor-grabbing border ${colors.bg} ${colors.border} ${colors.hover}`}
       title={`${task.title} — clique para editar, arraste para mudar o dia`}
     >
+      {task.phone && onCopyPhone && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCopyPhone(task.phone!);
+          }}
+          className="absolute top-1 right-1 opacity-80 hover:opacity-100 text-[#25D366] hover:text-[#1ebe5d] transition"
+          title={`Copiar telefone (${task.phone})`}
+          aria-label="Copiar telefone para WhatsApp"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.6 6.32A7.85 7.85 0 0 0 12 4a7.94 7.94 0 0 0-6.87 11.93L4 20l4.2-1.1A7.94 7.94 0 0 0 12 19.94a7.94 7.94 0 0 0 7.94-7.94 7.85 7.85 0 0 0-2.34-5.68Zm-5.6 12.22a6.6 6.6 0 0 1-3.36-.92l-.24-.14-2.49.65.67-2.43-.16-.25a6.59 6.59 0 1 1 12.24-3.48 6.6 6.6 0 0 1-6.66 6.57Zm3.62-4.92c-.2-.1-1.18-.58-1.36-.65s-.31-.1-.45.1-.51.65-.62.78-.23.15-.43.05a5.4 5.4 0 0 1-1.6-1 6 6 0 0 1-1.1-1.37c-.12-.2 0-.3.09-.4l.3-.35a1.4 1.4 0 0 0 .2-.34.36.36 0 0 0 0-.35c-.05-.1-.45-1.08-.62-1.48s-.33-.34-.45-.34h-.4a.78.78 0 0 0-.56.26 2.36 2.36 0 0 0-.73 1.75A4.1 4.1 0 0 0 8.43 13a9.34 9.34 0 0 0 3.57 3.17 12.2 12.2 0 0 0 1.2.44 2.9 2.9 0 0 0 1.32.08 2.15 2.15 0 0 0 1.41-1 1.74 1.74 0 0 0 .13-1c-.05-.08-.18-.13-.38-.23Z" />
+          </svg>
+        </button>
+      )}
       {task.dealName && (
-        <div className={`text-[9px] leading-snug break-words ${colors.deadline}`}>
+        <div
+          className={`text-[9px] leading-snug break-words ${colors.deadline} ${
+            task.phone ? "pr-5" : ""
+          }`}
+        >
           {task.dealName}
         </div>
       )}
-      <div className={`text-[11px] font-medium leading-snug break-words ${colors.title}`}>
+      <div
+        className={`text-[11px] font-medium leading-snug break-words ${colors.title} ${
+          task.phone && !task.dealName ? "pr-5" : ""
+        }`}
+      >
         {task.title}
       </div>
-    </button>
+    </div>
   );
 }
 
 function MonthlyTaskItem({
   task,
   onClick,
+  onCopyPhone,
 }: {
   task: TaskCard;
   onClick: () => void;
+  onCopyPhone?: (phone: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
   });
   const colors = TASK_TYPE_COLORS[task.type];
   return (
-    <button
+    <div
       ref={setNodeRef}
-      type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        if (
+          (e.target as HTMLElement).closest(
+            "button, a, input, textarea, select"
+          )
+        )
+          return;
+        onClick();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       {...attributes}
       {...listeners}
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      className={`block w-full text-left transition rounded px-1.5 py-1 leading-snug break-words cursor-grab active:cursor-grabbing border ${colors.bg} ${colors.border} ${colors.hover}`}
+      className={`relative block w-full text-left transition rounded px-1.5 py-1 leading-snug break-words cursor-grab active:cursor-grabbing border ${colors.bg} ${colors.border} ${colors.hover}`}
       title={
         task.dealName
           ? `${task.dealName} — ${task.title} — clique para editar, arraste para mudar o dia`
           : `${task.title} — clique para editar, arraste para mudar o dia`
       }
     >
+      {task.phone && onCopyPhone && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCopyPhone(task.phone!);
+          }}
+          className="absolute top-0.5 right-0.5 opacity-80 hover:opacity-100 text-[#25D366] hover:text-[#1ebe5d] transition"
+          title={`Copiar telefone (${task.phone})`}
+          aria-label="Copiar telefone para WhatsApp"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.6 6.32A7.85 7.85 0 0 0 12 4a7.94 7.94 0 0 0-6.87 11.93L4 20l4.2-1.1A7.94 7.94 0 0 0 12 19.94a7.94 7.94 0 0 0 7.94-7.94 7.85 7.85 0 0 0-2.34-5.68Zm-5.6 12.22a6.6 6.6 0 0 1-3.36-.92l-.24-.14-2.49.65.67-2.43-.16-.25a6.59 6.59 0 1 1 12.24-3.48 6.6 6.6 0 0 1-6.66 6.57Zm3.62-4.92c-.2-.1-1.18-.58-1.36-.65s-.31-.1-.45.1-.51.65-.62.78-.23.15-.43.05a5.4 5.4 0 0 1-1.6-1 6 6 0 0 1-1.1-1.37c-.12-.2 0-.3.09-.4l.3-.35a1.4 1.4 0 0 0 .2-.34.36.36 0 0 0 0-.35c-.05-.1-.45-1.08-.62-1.48s-.33-.34-.45-.34h-.4a.78.78 0 0 0-.56.26 2.36 2.36 0 0 0-.73 1.75A4.1 4.1 0 0 0 8.43 13a9.34 9.34 0 0 0 3.57 3.17 12.2 12.2 0 0 0 1.2.44 2.9 2.9 0 0 0 1.32.08 2.15 2.15 0 0 0 1.41-1 1.74 1.74 0 0 0 .13-1c-.05-.08-.18-.13-.38-.23Z" />
+          </svg>
+        </button>
+      )}
       {task.dealName && (
-        <div className={`text-[8px] leading-snug break-words ${colors.deadline}`}>
+        <div
+          className={`text-[8px] leading-snug break-words ${colors.deadline} ${
+            task.phone ? "pr-4" : ""
+          }`}
+        >
           {task.dealName}
         </div>
       )}
-      <div className={`text-[10px] font-medium leading-snug break-words ${colors.title}`}>
+      <div
+        className={`text-[10px] font-medium leading-snug break-words ${colors.title} ${
+          task.phone && !task.dealName ? "pr-4" : ""
+        }`}
+      >
         {task.title}
       </div>
-    </button>
+    </div>
   );
 }

@@ -55,12 +55,46 @@ export async function GET() {
     }
 
     const dealMap = new Map<string, string>();
+    const dealPhoneMap = new Map<string, string>();
     if (dealIds.size > 0) {
       const deals = await bitrix<any[]>("crm.deal.list", {
         filter: { ID: Array.from(dealIds) },
-        select: ["ID", "TITLE"],
+        select: ["ID", "TITLE", "CONTACT_ID"],
       });
-      for (const d of deals) dealMap.set(d.ID, d.TITLE);
+      const dealToContact = new Map<string, string>();
+      const contactIdSet = new Set<string>();
+      for (const d of deals) {
+        dealMap.set(d.ID, d.TITLE);
+        if (d.CONTACT_ID && d.CONTACT_ID !== "0") {
+          dealToContact.set(String(d.ID), String(d.CONTACT_ID));
+          contactIdSet.add(String(d.CONTACT_ID));
+        }
+      }
+      if (contactIdSet.size > 0) {
+        const contactPhone = new Map<string, string>();
+        const idsArr = Array.from(contactIdSet);
+        for (let i = 0; i < idsArr.length; i += 50) {
+          const chunk = idsArr.slice(i, i + 50);
+          const contacts = await bitrix<any[]>("crm.contact.list", {
+            filter: { ID: chunk },
+            select: ["ID", "PHONE"],
+          });
+          for (const c of contacts || []) {
+            const phones = (c.PHONE || []) as Array<{
+              VALUE?: string;
+              VALUE_TYPE?: string;
+            }>;
+            if (!phones.length) continue;
+            const mobile = phones.find((p) => p.VALUE_TYPE === "MOBILE");
+            const phone = (mobile || phones[0])?.VALUE;
+            if (phone) contactPhone.set(String(c.ID), phone);
+          }
+        }
+        for (const [did, cid] of dealToContact) {
+          const phone = contactPhone.get(cid);
+          if (phone) dealPhoneMap.set(did, phone);
+        }
+      }
     }
 
     const tasksMap: Record<string, TaskCard> = {};
@@ -76,6 +110,7 @@ export async function GET() {
         deadline: t.deadline || null,
         dealId,
         dealName: dealId ? dealMap.get(dealId) : undefined,
+        phone: dealId ? dealPhoneMap.get(dealId) : undefined,
         type: inferTaskType(t.title),
       };
     }
