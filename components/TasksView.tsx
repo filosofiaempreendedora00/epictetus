@@ -124,16 +124,25 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     dealId?: string;
   }) {
     if (!fields.dealId) throw new Error("Selecione o negócio do Kanban");
-    const res = await fetch("/api/bitrix/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: fields.title,
-        description: fields.description,
-        dealId: fields.dealId,
-        deadline: fields.deadline,
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/bitrix/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: fields.title,
+          description: fields.description,
+          dealId: fields.dealId,
+          deadline: fields.deadline,
+        }),
+      });
+    } catch (netErr: any) {
+      // "Failed to fetch" geralmente acontece em cold start do Render —
+      // o serviço estava dormindo. Mensagem mais explicativa.
+      throw new Error(
+        "Servidor demorou pra responder (provável cold start do Render). Aguarde alguns segundos e tente novamente."
+      );
+    }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error || "Falha ao criar tarefa no Bitrix");
