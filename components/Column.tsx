@@ -19,6 +19,7 @@ type Props = {
   onUpdateProposalLink?: (cardId: string, link: string) => Promise<void>;
   allStages?: Array<{ stageId: string; title: string }>;
   onChangeStage?: (cardId: string, newStageId: string) => Promise<void>;
+  onOpenDealEdit?: (cardTitle: string) => void;
 };
 
 export default function Column({
@@ -35,6 +36,7 @@ export default function Column({
   onUpdateProposalLink,
   allStages,
   onChangeStage,
+  onOpenDealEdit,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -106,6 +108,7 @@ export default function Column({
               allStages={allStages}
               currentStageId={column.stageId}
               onChangeStage={onChangeStage}
+              onOpenDealEdit={onOpenDealEdit}
             />
           ))}
         </SortableContext>

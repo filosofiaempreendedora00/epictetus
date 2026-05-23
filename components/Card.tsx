@@ -6,7 +6,6 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Card as CardType } from "@/lib/types";
 import { formatBRL } from "@/lib/initialData";
 import TaskEditModal from "./TaskEditModal";
-import DealEditModal from "./DealEditModal";
 import { TASK_TYPE_COLORS } from "@/lib/taskTypes";
 
 type Props = {
@@ -28,6 +27,10 @@ type Props = {
   allStages?: Array<{ stageId: string; title: string }>;
   currentStageId?: string;
   onChangeStage?: (cardId: string, newStageId: string) => Promise<void>;
+  // Abrir o modal "Editar negócio" agora é responsabilidade do parent
+  // (Board) — ele atualiza a URL pra /negocios/<nome> e renderiza o modal.
+  // Mantém só uma instância do modal por board (evita duplicação).
+  onOpenDealEdit?: (cardTitle: string) => void;
 };
 
 function pad2(n: number) {
@@ -166,6 +169,7 @@ export default function Card({
   allStages,
   currentStageId,
   onChangeStage,
+  onOpenDealEdit,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -175,7 +179,6 @@ export default function Card({
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
-  const [editingDeal, setEditingDeal] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [editingProposal, setEditingProposal] = useState(false);
   const [proposalDraft, setProposalDraft] = useState("");
@@ -248,13 +251,13 @@ export default function Card({
         {...attributes}
         {...listeners}
         onClick={(e) => {
-          if (!onChangeStage || !allStages?.length) return;
+          if (!onOpenDealEdit) return;
           // ignora cliques originados em elementos filhos interativos
           // (cada um já chama stopPropagation, mas guardamos por segurança)
           if ((e.target as HTMLElement).closest("button, input, textarea, select, a, [contenteditable='true']")) {
             return;
           }
-          setEditingDeal(true);
+          onOpenDealEdit(card.title);
         }}
         className="group bg-white rounded-xl shadow-sm px-3 py-2.5 cursor-grab active:cursor-grabbing relative overflow-hidden hover:shadow-md transition"
       >
@@ -524,16 +527,6 @@ export default function Card({
               ? () => onCompleteTask(card.id, editingTask.id)
               : undefined
           }
-        />
-      )}
-
-      {editingDeal && allStages && onChangeStage && (
-        <DealEditModal
-          cardTitle={card.title}
-          currentStageId={currentStageId}
-          stages={allStages}
-          onClose={() => setEditingDeal(false)}
-          onSave={(newStageId) => onChangeStage(card.id, newStageId)}
         />
       )}
 

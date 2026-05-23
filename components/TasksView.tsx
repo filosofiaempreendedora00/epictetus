@@ -21,7 +21,12 @@ import {
   type TaskType,
 } from "@/lib/taskTypes";
 import TaskEditModal from "./TaskEditModal";
-import { useUrlIntState, useUrlPatch, useUrlState } from "@/lib/useUrlState";
+import {
+  closeModal,
+  openNovaTarefa,
+  useRoute,
+  type DateView,
+} from "@/lib/route";
 import { findDealByQuery, formatDiaParam, parseDiaParam } from "@/lib/dateParams";
 
 const EMPTY: TasksBoardState = { tasks: {} };
@@ -31,8 +36,6 @@ const PT_MONTH_LONG = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
   "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
 ];
-
-type DateView = "weekly" | "biweekly" | "monthly";
 
 function pad2(n: number) {
   return n < 10 ? `0${n}` : String(n);
@@ -84,24 +87,27 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [state, setState] = useState<TasksBoardState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateView, setDateView] = useUrlState<DateView>("dateView", "weekly");
+  // Estado navegável (path-based, em português) vem do useRoute.
+  //   /tarefas/semanal | duas-semanas | mensal             → dateView
+  //   /tarefas/<periodo>/fup | r2-r3 | criar-proposta | …  → typeFilter
+  //   /tarefas/nova[/<dia>][/<cliente>]                    → modal nova tarefa
+  //   ?semana=N                                            → weekOffset
+  const { route, setRoute } = useRoute();
+  const dateView = route.dateView;
+  const setDateView = (v: DateView) => setRoute({ dateView: v });
+  const typeFilter = route.typeFilter;
+  const setTypeFilter = (v: TaskType | "ALL") =>
+    setRoute({ typeFilter: v });
+  const weekOffset = route.weekOffset;
+  const setWeekOffset = (v: number) => setRoute({ weekOffset: v });
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  // Modal de nova tarefa é controlado pela URL pra suportar deep linking:
-  //   ?modal=novaTarefa            → abre o modal
-  //   &dia=hoje|amanha|YYYY-MM-DD  → pré-preenche o prazo
-  //   &negocio=<nome ou id>        → pré-preenche o negócio
-  const [modalParam] = useUrlState<string>("modal", "");
-  const [diaParam] = useUrlState<string>("dia", "");
-  const [negocioParam] = useUrlState<string>("negocio", "");
-  const patchUrl = useUrlPatch();
-  const creatingTask = modalParam === "novaTarefa";
-  const creatingForDate = creatingTask ? parseDiaParam(diaParam) : null;
+  const creatingTask = route.modal === "novaTarefa";
+  const creatingForDate = creatingTask ? parseDiaParam(route.dia) : null;
   const creatingForDealIdFromUrl = creatingTask
-    ? findDealByQuery(negocioParam, state.deals)?.id ?? null
+    ? findDealByQuery(route.cliente, state.deals)?.id ?? null
     : null;
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
-  const [weekOffset, setWeekOffset] = useUrlIntState("week", 0); // semanas a partir da semana atual
 
   async function handleCopyPhone(phone: string) {
     if (!phone) return;
@@ -121,10 +127,6 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     setCopiedPhone(phone);
     window.setTimeout(() => setCopiedPhone(null), 2200);
   }
-  const [typeFilter, setTypeFilter] = useUrlState<TaskType | "ALL">(
-    "type",
-    "ALL"
-  );
 
   const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
   const draggedTask = draggedTaskId ? state.tasks[draggedTaskId] : null;
@@ -207,11 +209,12 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
       // Após concluir com sucesso, encadeia abertura do modal de criação
       // de uma nova tarefa com o mesmo negócio já pré-selecionado.
       setEditingTaskId(null);
-      patchUrl({
-        modal: "novaTarefa",
-        negocio: prev.dealName || prev.dealId || null,
-        dia: null,
-      });
+      setRoute(
+        openNovaTarefa({
+          cliente: prev.dealName || prev.dealId || null,
+          dia: null,
+        })
+      );
     } catch (e: any) {
       setState((s) => ({
         ...s,
@@ -363,7 +366,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     for (const t of Object.values(state.tasks)) {
       if (!t.deadline) continue;
       counts.ALL++;
-      counts[t.type]++;
+      counts[t.type as TaskType]++;
     }
     return counts;
   }, [state.tasks]);
@@ -415,7 +418,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
         <DateViewSwitcher value={dateView} onChange={setDateView} />
         <button
           type="button"
-          onClick={() => patchUrl({ modal: "novaTarefa", dia: null, negocio: null })}
+          onClick={() => setRoute(openNovaTarefa())}
           className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition shadow-md shadow-emerald-500/20"
         >
           <span className="text-base leading-none">+</span> Criar tarefa
@@ -441,11 +444,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
             onWeekOffsetChange={setWeekOffset}
             onTaskClick={setEditingTaskId}
             onCreateTaskForDay={(d) =>
-              patchUrl({
-                modal: "novaTarefa",
-                dia: formatDiaParam(d),
-                negocio: null,
-              })
+              setRoute(openNovaTarefa({ dia: formatDiaParam(d) }))
             }
             onCopyPhone={handleCopyPhone}
           />
@@ -498,9 +497,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
           initialDealId={creatingForDealIdFromUrl}
           dealsForSelect={state.deals || []}
           saveLabel="Criar"
-          onClose={() =>
-            patchUrl({ modal: null, dia: null, negocio: null })
-          }
+          onClose={() => setRoute(closeModal())}
           onSave={handleCreateTask}
         />
       )}

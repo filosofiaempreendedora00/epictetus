@@ -17,12 +17,17 @@ import type { BoardState, Card as CardType } from "@/lib/types";
 import { formatBRL } from "@/lib/initialData";
 import Column from "./Column";
 import Card from "./Card";
-import Header, { type ViewMode } from "./Header";
+import Header from "./Header";
 import TasksView from "./TasksView";
 import CongeladoModal from "./CongeladoModal";
 import ReuniaoRealizadaModal from "./ReuniaoRealizadaModal";
 import DealEditModal from "./DealEditModal";
-import { useUrlPatch, useUrlState } from "@/lib/useUrlState";
+import {
+  closeModal,
+  openEditarNegocio,
+  useRoute,
+  type ViewMode,
+} from "@/lib/route";
 import { findDealByQuery } from "@/lib/dateParams";
 
 const LOSE_STAGE_ID = "LOSE";
@@ -35,12 +40,11 @@ export default function Board() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
-  const [searchTerm, setSearchTerm] = useUrlState<string>("q", "");
-  const [viewMode, setViewMode] = useUrlState<ViewMode>("view", "negocios");
-  // Modal de editar negócio via URL — ex.: ?modal=editarNegocio&negocio=luma
-  const [modalParam] = useUrlState<string>("modal", "");
-  const [negocioParam] = useUrlState<string>("negocio", "");
-  const patchUrl = useUrlPatch();
+  const { route, setRoute } = useRoute();
+  const searchTerm = route.busca;
+  const viewMode = route.view;
+  const setSearchTerm = (v: string) => setRoute({ busca: v });
+  const setViewMode = (v: ViewMode) => setRoute({ view: v });
   const [dragOriginColId, setDragOriginColId] = useState<string | null>(null);
   const [pendingCongelado, setPendingCongelado] = useState<{
     cardId: string;
@@ -674,6 +678,9 @@ export default function Board() {
                     .filter((c) => c.stageId)
                     .map((c) => ({ stageId: c.stageId!, title: c.title }))}
                   onChangeStage={handleChangeStage}
+                  onOpenDealEdit={(name) =>
+                    setRoute(openEditarNegocio(name))
+                  }
                 />
               );
             })}
@@ -709,13 +716,13 @@ export default function Board() {
         />
       )}
 
-      {/* Modal "Editar negócio" controlado por URL — ?modal=editarNegocio&negocio=nome */}
+      {/* Modal "Editar negócio" controlado pelo path — /negocios/<nome> */}
       {(() => {
-        if (modalParam !== "editarNegocio") return null;
+        if (route.modal !== "editarNegocio") return null;
         const dealOptions = Object.values(state.cards)
           .filter((c) => !!c.bitrixId)
           .map((c) => ({ id: c.id, name: c.title }));
-        const match = findDealByQuery(negocioParam, dealOptions);
+        const match = findDealByQuery(route.cliente, dealOptions);
         if (!match) return null;
         const card = state.cards[match.id];
         const currentColId = findColumnIdByCard(match.id);
@@ -728,7 +735,7 @@ export default function Board() {
             cardTitle={card.title}
             currentStageId={currentCol?.stageId}
             stages={allStages}
-            onClose={() => patchUrl({ modal: null, negocio: null })}
+            onClose={() => setRoute(closeModal())}
             onSave={(newStageId) => handleChangeStage(match.id, newStageId)}
           />
         );
