@@ -43,6 +43,37 @@ export function useUrlState<T extends string>(
 }
 
 /**
+ * Atualiza vários parâmetros da URL de uma vez (atômico — um único
+ * router.replace). Útil quando abrir/fechar um modal precisa setar
+ * múltiplos params relacionados sem race conditions.
+ *
+ * Passe `null` ou string vazia em qualquer key pra REMOVER o param.
+ */
+export function useUrlPatch(): (
+  patch: Record<string, string | null | undefined>
+) => void {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  return useCallback(
+    (patch) => {
+      const params = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(patch)) {
+        if (value == null || value === "") {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [searchParams, router, pathname]
+  );
+}
+
+/**
  * Variante numérica — converte int de e pra string nos bastidores.
  */
 export function useUrlIntState(

@@ -21,7 +21,8 @@ import {
   type TaskType,
 } from "@/lib/taskTypes";
 import TaskEditModal from "./TaskEditModal";
-import { useUrlIntState, useUrlState } from "@/lib/useUrlState";
+import { useUrlIntState, useUrlPatch, useUrlState } from "@/lib/useUrlState";
+import { findDealByQuery, formatDiaParam, parseDiaParam } from "@/lib/dateParams";
 
 const EMPTY: TasksBoardState = { tasks: {} };
 
@@ -86,9 +87,19 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [dateView, setDateView] = useUrlState<DateView>("dateView", "weekly");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [creatingTask, setCreatingTask] = useState(false);
-  const [creatingForDate, setCreatingForDate] = useState<Date | null>(null);
-  const [creatingForDealId, setCreatingForDealId] = useState<string | null>(null);
+  // Modal de nova tarefa é controlado pela URL pra suportar deep linking:
+  //   ?modal=novaTarefa            → abre o modal
+  //   &dia=hoje|amanha|YYYY-MM-DD  → pré-preenche o prazo
+  //   &negocio=<nome ou id>        → pré-preenche o negócio
+  const [modalParam] = useUrlState<string>("modal", "");
+  const [diaParam] = useUrlState<string>("dia", "");
+  const [negocioParam] = useUrlState<string>("negocio", "");
+  const patchUrl = useUrlPatch();
+  const creatingTask = modalParam === "novaTarefa";
+  const creatingForDate = creatingTask ? parseDiaParam(diaParam) : null;
+  const creatingForDealIdFromUrl = creatingTask
+    ? findDealByQuery(negocioParam, state.deals)?.id ?? null
+    : null;
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useUrlIntState("week", 0); // semanas a partir da semana atual
 
@@ -196,8 +207,11 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
       // Após concluir com sucesso, encadeia abertura do modal de criação
       // de uma nova tarefa com o mesmo negócio já pré-selecionado.
       setEditingTaskId(null);
-      if (prev.dealId) setCreatingForDealId(prev.dealId);
-      setCreatingTask(true);
+      patchUrl({
+        modal: "novaTarefa",
+        negocio: prev.dealName || prev.dealId || null,
+        dia: null,
+      });
     } catch (e: any) {
       setState((s) => ({
         ...s,
@@ -401,7 +415,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
         <DateViewSwitcher value={dateView} onChange={setDateView} />
         <button
           type="button"
-          onClick={() => setCreatingTask(true)}
+          onClick={() => patchUrl({ modal: "novaTarefa", dia: null, negocio: null })}
           className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition shadow-md shadow-emerald-500/20"
         >
           <span className="text-base leading-none">+</span> Criar tarefa
@@ -426,10 +440,13 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
             weekOffset={weekOffset}
             onWeekOffsetChange={setWeekOffset}
             onTaskClick={setEditingTaskId}
-            onCreateTaskForDay={(d) => {
-              setCreatingForDate(d);
-              setCreatingTask(true);
-            }}
+            onCreateTaskForDay={(d) =>
+              patchUrl({
+                modal: "novaTarefa",
+                dia: formatDiaParam(d),
+                negocio: null,
+              })
+            }
             onCopyPhone={handleCopyPhone}
           />
         )}
@@ -478,14 +495,12 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
                 })()
               : null
           }
-          initialDealId={creatingForDealId}
+          initialDealId={creatingForDealIdFromUrl}
           dealsForSelect={state.deals || []}
           saveLabel="Criar"
-          onClose={() => {
-            setCreatingTask(false);
-            setCreatingForDate(null);
-            setCreatingForDealId(null);
-          }}
+          onClose={() =>
+            patchUrl({ modal: null, dia: null, negocio: null })
+          }
           onSave={handleCreateTask}
         />
       )}

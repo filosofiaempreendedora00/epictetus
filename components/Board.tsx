@@ -15,13 +15,15 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import type { BoardState, Card as CardType } from "@/lib/types";
 import { formatBRL } from "@/lib/initialData";
-import { useUrlState } from "@/lib/useUrlState";
 import Column from "./Column";
 import Card from "./Card";
 import Header, { type ViewMode } from "./Header";
 import TasksView from "./TasksView";
 import CongeladoModal from "./CongeladoModal";
 import ReuniaoRealizadaModal from "./ReuniaoRealizadaModal";
+import DealEditModal from "./DealEditModal";
+import { useUrlPatch, useUrlState } from "@/lib/useUrlState";
+import { findDealByQuery } from "@/lib/dateParams";
 
 const LOSE_STAGE_ID = "LOSE";
 const NEW_STAGE_ID = "NEW";
@@ -35,6 +37,10 @@ export default function Board() {
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [searchTerm, setSearchTerm] = useUrlState<string>("q", "");
   const [viewMode, setViewMode] = useUrlState<ViewMode>("view", "negocios");
+  // Modal de editar negócio via URL — ex.: ?modal=editarNegocio&negocio=luma
+  const [modalParam] = useUrlState<string>("modal", "");
+  const [negocioParam] = useUrlState<string>("negocio", "");
+  const patchUrl = useUrlPatch();
   const [dragOriginColId, setDragOriginColId] = useState<string | null>(null);
   const [pendingCongelado, setPendingCongelado] = useState<{
     cardId: string;
@@ -702,6 +708,31 @@ export default function Board() {
           onConfirm={handleConfirmReuniaoExit}
         />
       )}
+
+      {/* Modal "Editar negócio" controlado por URL — ?modal=editarNegocio&negocio=nome */}
+      {(() => {
+        if (modalParam !== "editarNegocio") return null;
+        const dealOptions = Object.values(state.cards)
+          .filter((c) => !!c.bitrixId)
+          .map((c) => ({ id: c.id, name: c.title }));
+        const match = findDealByQuery(negocioParam, dealOptions);
+        if (!match) return null;
+        const card = state.cards[match.id];
+        const currentColId = findColumnIdByCard(match.id);
+        const currentCol = state.columns.find((c) => c.id === currentColId);
+        const allStages = state.columns
+          .filter((c) => c.stageId)
+          .map((c) => ({ stageId: c.stageId!, title: c.title }));
+        return (
+          <DealEditModal
+            cardTitle={card.title}
+            currentStageId={currentCol?.stageId}
+            stages={allStages}
+            onClose={() => patchUrl({ modal: null, negocio: null })}
+            onSave={(newStageId) => handleChangeStage(match.id, newStageId)}
+          />
+        );
+      })()}
     </>
   );
 }
