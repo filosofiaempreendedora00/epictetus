@@ -21,6 +21,7 @@ import {
   type TaskType,
 } from "@/lib/taskTypes";
 import TaskEditModal from "./TaskEditModal";
+import { useUrlIntState, useUrlState } from "@/lib/useUrlState";
 
 const EMPTY: TasksBoardState = { tasks: {} };
 
@@ -82,14 +83,14 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   const [state, setState] = useState<TasksBoardState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateView, setDateView] = useState<DateView>("weekly");
+  const [dateView, setDateView] = useUrlState<DateView>("dateView", "weekly");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
   const [creatingForDate, setCreatingForDate] = useState<Date | null>(null);
   const [creatingForDealId, setCreatingForDealId] = useState<string | null>(null);
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
-  const [weekOffset, setWeekOffset] = useState(0); // semanas a partir da semana atual
+  const [weekOffset, setWeekOffset] = useUrlIntState("week", 0); // semanas a partir da semana atual
 
   async function handleCopyPhone(phone: string) {
     if (!phone) return;
@@ -109,7 +110,10 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
     setCopiedPhone(phone);
     window.setTimeout(() => setCopiedPhone(null), 2200);
   }
-  const [typeFilter, setTypeFilter] = useState<TaskType | "ALL">("ALL");
+  const [typeFilter, setTypeFilter] = useUrlState<TaskType | "ALL">(
+    "type",
+    "ALL"
+  );
 
   const editingTask = editingTaskId ? state.tasks[editingTaskId] : null;
   const draggedTask = draggedTaskId ? state.tasks[draggedTaskId] : null;

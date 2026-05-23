@@ -15,6 +15,7 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import type { BoardState, Card as CardType } from "@/lib/types";
 import { formatBRL } from "@/lib/initialData";
+import { useUrlState } from "@/lib/useUrlState";
 import Column from "./Column";
 import Card from "./Card";
 import Header, { type ViewMode } from "./Header";
@@ -32,8 +33,8 @@ export default function Board() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("negocios");
+  const [searchTerm, setSearchTerm] = useUrlState<string>("q", "");
+  const [viewMode, setViewMode] = useUrlState<ViewMode>("view", "negocios");
   const [dragOriginColId, setDragOriginColId] = useState<string | null>(null);
   const [pendingCongelado, setPendingCongelado] = useState<{
     cardId: string;

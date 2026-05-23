@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Board from "@/components/Board";
 import Sidebar from "@/components/Sidebar";
 
@@ -6,7 +7,13 @@ export default function Page() {
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 min-w-0">
-        <Board />
+        <Suspense
+          fallback={
+            <div className="px-6 py-10 text-white/60 text-sm">Carregando…</div>
+          }
+        >
+          <Board />
+        </Suspense>
       </main>
     </div>
   );
