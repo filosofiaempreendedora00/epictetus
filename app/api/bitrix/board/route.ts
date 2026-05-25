@@ -133,6 +133,8 @@ async function fetchOpenTasks(): Promise<RawTask[]> {
     out.push(...chunk);
     if (chunk.length < 50) break;
     start += 50;
+    // Throttle entre páginas pra não estourar o limite do Bitrix.
+    await new Promise((r) => setTimeout(r, 120));
   }
   return out;
 }

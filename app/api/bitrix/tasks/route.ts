@@ -31,6 +31,8 @@ async function fetchRobertoOpenTasks(responsibleId: string): Promise<RawTaskItem
     out.push(...chunk);
     if (chunk.length < 50) break;
     start += 50;
+    // Throttle entre páginas (rate limit do Bitrix ~2 req/s).
+    await new Promise((r) => setTimeout(r, 120));
   }
   return out;
 }
