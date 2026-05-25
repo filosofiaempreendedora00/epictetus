@@ -50,8 +50,23 @@ export function formatDiaParam(date: Date): string {
 }
 
 /**
- * Procura um deal pelo seu ID exato ou por substring do nome
- * (case-insensitive). Útil pra URLs amigáveis como ?negocio=luma.
+ * Slugifica um nome (deve casar com `slugifyClient` em lib/route.ts):
+ * remove acentos, lowercase, troca não-alfanumérico por `-`.
+ */
+function slugify(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Procura um deal por ID exato, por substring do nome (case-insensitive)
+ * ou por slug. O fallback por slug é o que faz `/negocios/geral-sonnix-david-david`
+ * achar o deal `[Geral] Sonnix | David David` — sem ele, o path-routing
+ * abria a URL mas o modal nem renderizava.
  */
 export function findDealByQuery<T extends { id: string; name: string }>(
   query: string | null | undefined,
@@ -65,5 +80,14 @@ export function findDealByQuery<T extends { id: string; name: string }>(
   if (byId) return byId;
   // 2) Nome contendo a query (case-insensitive)
   const byName = deals.find((d) => d.name.toLowerCase().includes(q));
-  return byName || null;
+  if (byName) return byName;
+  // 3) Slug do nome contém o slug da query (ou vice-versa, pra ser
+  //    permissivo com queries curtas tipo "luma")
+  const slugQ = slugify(q);
+  if (!slugQ) return null;
+  const bySlug = deals.find((d) => {
+    const slugName = slugify(d.name);
+    return slugName.includes(slugQ) || slugQ.includes(slugName);
+  });
+  return bySlug || null;
 }

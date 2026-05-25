@@ -257,6 +257,14 @@ export default function Card({
           if ((e.target as HTMLElement).closest("button, input, textarea, select, a, [contenteditable='true']")) {
             return;
           }
+          // Se algum input/textarea ainda está montado no card (ex.: usuário
+          // editando Valor R/P ou link da proposta), esse clique é o "blur"
+          // pra commitar a edição — NÃO devemos abrir o modal de editar
+          // negócio em cima. Esse era o bug do "tentei mudar Valor R e
+          // abriu uma tela estranha".
+          if (e.currentTarget.querySelector("input, textarea")) {
+            return;
+          }
           onOpenDealEdit(card.title);
         }}
         className="group bg-white rounded-xl shadow-sm px-3 py-2.5 cursor-grab active:cursor-grabbing relative overflow-hidden hover:shadow-md transition"
