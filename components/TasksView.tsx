@@ -389,19 +389,19 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
   }
 
   return (
-    <div className="px-6 pb-6">
+    <div className="px-3 sm:px-6 pb-6">
       {/* Filtro por tipo (estilo neutro — a cor fica nos cards) */}
       <div className="mb-2 flex items-center gap-1.5 flex-wrap">
         {(["ALL", ...TASK_TYPE_ORDER] as const).map((t) => {
           const active = typeFilter === t;
           const label =
-            t === "ALL" ? "Todas as tarefas" : TASK_TYPE_INFO[t].label;
+            t === "ALL" ? "Todas" : TASK_TYPE_INFO[t].label;
           return (
             <button
               key={t}
               type="button"
               onClick={() => setTypeFilter(t)}
-              className={`text-[12px] px-3 py-1 rounded-full border transition ${
+              className={`text-[12px] px-3 py-1.5 sm:py-1 rounded-full border transition ${
                 active
                   ? "bg-white text-slate-900 border-white font-medium"
                   : "bg-white/[0.06] text-white/70 border-white/15 hover:bg-white/[0.12] hover:text-white"
@@ -419,7 +419,7 @@ export default function TasksView({ searchTerm }: { searchTerm: string }) {
         <button
           type="button"
           onClick={() => setRoute(openNovaTarefa())}
-          className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition shadow-md shadow-emerald-500/20"
+          className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium px-3 py-2 sm:py-1.5 rounded-lg transition shadow-md shadow-emerald-500/20"
         >
           <span className="text-base leading-none">+</span> Criar tarefa
         </button>
@@ -593,11 +593,12 @@ function DayColumnsView({
   return (
     <div>
       {/* Barra de navegação de semanas */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
         <button
           type="button"
           onClick={() => onWeekOffsetChange(weekOffset - weekSpan)}
-          className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
+          // Touch area 36px em mobile, 28px no desktop
+          className="w-9 h-9 sm:w-7 sm:h-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
           title="Semana anterior"
           aria-label="Semana anterior"
         >
@@ -617,7 +618,7 @@ function DayColumnsView({
         <button
           type="button"
           onClick={() => onWeekOffsetChange(weekOffset + weekSpan)}
-          className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
+          className="w-9 h-9 sm:w-7 sm:h-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
           title="Próxima semana"
           aria-label="Próxima semana"
         >
@@ -634,14 +635,14 @@ function DayColumnsView({
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
-        <div className="text-white/80 text-[13px] font-medium">
+        <div className="text-white/80 text-[13px] font-medium min-w-0 flex-1 truncate">
           {formatRange(start, lastDay)}
         </div>
         {weekOffset !== 0 && (
           <button
             type="button"
             onClick={() => onWeekOffsetChange(0)}
-            className="ml-2 text-[12px] px-2 py-1 rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
+            className="ml-auto sm:ml-2 text-[12px] px-3 sm:px-2 py-1.5 sm:py-1 rounded-md border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white transition"
             title="Voltar pra semana atual"
           >
             Hoje
@@ -649,47 +650,52 @@ function DayColumnsView({
         )}
       </div>
 
+      {/* Desktop (≥sm): grade horizontal de colunas-dia.
+          Mobile (<sm): empilha verticalmente, cada dia com header próprio
+          dentro da célula — economiza espaço e fica scrolável de cima
+          pra baixo, padrão familiar de calendário em celular. */}
       <div className="border-t border-white/10">
-      {/* Cabeçalho de dias */}
-      <div className="flex">
-        {dayList.map((d) => {
-          const today = isSameDay(d, now);
-          return (
-            <div
-              key={dayKey(d)}
-              className="flex-1 min-w-0 border-r border-white/5 px-2 py-2 flex items-baseline gap-2"
-            >
-              <span className="text-white/40 text-[11px] uppercase tracking-wide">
-                {DOW_SHORT[d.getDay()]}
-              </span>
-              {today ? (
-                <span className="bg-red-500 text-white text-[11px] font-semibold rounded-full w-5 h-5 inline-flex items-center justify-center">
-                  {d.getDate()}
+        <div className="hidden sm:flex">
+          {dayList.map((d) => {
+            const today = isSameDay(d, now);
+            return (
+              <div
+                key={dayKey(d)}
+                className="flex-1 min-w-0 border-r border-white/5 px-2 py-2 flex items-baseline gap-2"
+              >
+                <span className="text-white/40 text-[11px] uppercase tracking-wide">
+                  {DOW_SHORT[d.getDay()]}
                 </span>
-              ) : (
-                <span className="text-white/70 text-[12px] font-medium">
-                  {d.getDate()}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {today ? (
+                  <span className="bg-red-500 text-white text-[11px] font-semibold rounded-full w-5 h-5 inline-flex items-center justify-center">
+                    {d.getDate()}
+                  </span>
+                ) : (
+                  <span className="text-white/70 text-[12px] font-medium">
+                    {d.getDate()}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
-      {/* Colunas com tarefas */}
-      <div className="flex" style={{ minHeight: "calc(100vh - 280px)" }}>
-        {dayList.map((d) => (
-          <DroppableDayColumn
-            key={dayKey(d)}
-            date={d}
-            isToday={isSameDay(d, now)}
-            tasks={tasksByDay.get(dayKey(d)) || []}
-            onTaskClick={onTaskClick}
-            onCreateTaskForDay={onCreateTaskForDay}
-            onCopyPhone={onCopyPhone}
-          />
-        ))}
-      </div>
+        <div
+          className="flex flex-col sm:flex-row"
+          style={{ minHeight: "calc(100dvh - 280px)" }}
+        >
+          {dayList.map((d) => (
+            <DroppableDayColumn
+              key={dayKey(d)}
+              date={d}
+              isToday={isSameDay(d, now)}
+              tasks={tasksByDay.get(dayKey(d)) || []}
+              onTaskClick={onTaskClick}
+              onCreateTaskForDay={onCreateTaskForDay}
+              onCopyPhone={onCopyPhone}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -714,15 +720,41 @@ function DroppableDayColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-0 border-r border-white/5 p-1.5 space-y-1.5 col-scroll overflow-y-auto transition ${
+      // Mobile: largura total + altura auto + borda inferior (empilha verticalmente).
+      // Desktop ≥sm: flex-1 + border-r (lado a lado, scroll vertical próprio).
+      // overflow-y só em desktop — em mobile cada cell cresce com o conteúdo
+      // pra fazer um scroll único de página, padrão mobile de calendário.
+      className={`w-full sm:flex-1 sm:min-w-0 border-b sm:border-b-0 sm:border-r border-white/5 p-1.5 space-y-1.5 transition sm:overflow-y-auto sm:col-scroll sm:max-h-[calc(100dvh-280px)] ${
         isOver
           ? "bg-sky-500/15 outline outline-1 outline-sky-400/50"
           : isToday
           ? "bg-white/[0.03]"
           : ""
       }`}
-      style={{ maxHeight: "calc(100vh - 280px)" }}
     >
+      {/* Header do dia — só em mobile (desktop tem a barra de dias acima) */}
+      <div className="sm:hidden flex items-baseline gap-2 pb-1 mb-1 border-b border-white/5">
+        <span className="text-white/40 text-[11px] uppercase tracking-wide">
+          {DOW_SHORT[date.getDay()]}
+        </span>
+        {isToday ? (
+          <span className="bg-red-500 text-white text-[11px] font-semibold rounded-full w-5 h-5 inline-flex items-center justify-center">
+            {date.getDate()}
+          </span>
+        ) : (
+          <span className="text-white/70 text-[12px] font-medium">
+            {date.getDate()}
+          </span>
+        )}
+        <span className="text-white/40 text-[11px]">
+          {PT_MONTH_LONG[date.getMonth()]}
+        </span>
+        {tasks.length > 0 && (
+          <span className="ml-auto text-white/40 text-[11px]">
+            {tasks.length} {tasks.length === 1 ? "tarefa" : "tarefas"}
+          </span>
+        )}
+      </div>
       {tasks.length === 0 && !onCreateTaskForDay && (
         <div className="text-center text-white/15 text-[10px] py-4 select-none">
           —
@@ -823,7 +855,9 @@ function DroppableMonthCell({
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[90px] border-r border-b border-white/5 p-1.5 last:border-r-0 transition ${
+      // Mobile: célula menor (60px) e mais compacta — em 375/7 ≈ 53px de
+      // largura é apertado. Desktop ≥sm volta pro 90px confortável.
+      className={`min-h-[60px] sm:min-h-[90px] border-r border-b border-white/5 p-1 sm:p-1.5 last:border-r-0 transition ${
         isOver
           ? "bg-sky-500/15 outline outline-1 outline-sky-400/50"
           : !inMonth
@@ -833,14 +867,14 @@ function DroppableMonthCell({
           : ""
       }`}
     >
-      <div className="flex items-center justify-end mb-1">
+      <div className="flex items-center justify-end mb-0.5 sm:mb-1">
         {isToday ? (
           <span className="bg-red-500 text-white text-[10px] font-semibold rounded-full w-5 h-5 inline-flex items-center justify-center">
             {date.getDate()}
           </span>
         ) : (
           <span
-            className={`text-[11px] ${
+            className={`text-[10px] sm:text-[11px] ${
               inMonth ? "text-white/70" : "text-white/25"
             }`}
           >
@@ -848,20 +882,45 @@ function DroppableMonthCell({
           </span>
         )}
       </div>
-      <div className="space-y-1">
-        {tasks.slice(0, 3).map((t) => (
-          <MonthlyTaskItem
-            key={t.id}
-            task={t}
-            onClick={() => onTaskClick(t.id)}
-            onCopyPhone={onCopyPhone}
-          />
-        ))}
-        {tasks.length > 3 && (
-          <div className="text-[9px] text-white/40">
-            +{tasks.length - 3} mais
-          </div>
-        )}
+      <div className="space-y-0.5 sm:space-y-1">
+        {/* Em mobile mostra max 2 tarefas como dots coloridos, no desktop
+            mostra preview com texto */}
+        <div className="hidden sm:block space-y-1">
+          {tasks.slice(0, 3).map((t) => (
+            <MonthlyTaskItem
+              key={t.id}
+              task={t}
+              onClick={() => onTaskClick(t.id)}
+              onCopyPhone={onCopyPhone}
+            />
+          ))}
+          {tasks.length > 3 && (
+            <div className="text-[9px] text-white/40">
+              +{tasks.length - 3} mais
+            </div>
+          )}
+        </div>
+        {/* Mobile: bolinhas + contador */}
+        <div className="sm:hidden flex items-center gap-0.5 flex-wrap">
+          {tasks.slice(0, 4).map((t) => {
+            const c = TASK_TYPE_COLORS[t.type];
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onTaskClick(t.id); }}
+                className={`w-1.5 h-1.5 rounded-full ${c.dot}`}
+                aria-label={t.title}
+                title={t.title}
+              />
+            );
+          })}
+          {tasks.length > 4 && (
+            <span className="text-[9px] text-white/50 ml-0.5">
+              +{tasks.length - 4}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

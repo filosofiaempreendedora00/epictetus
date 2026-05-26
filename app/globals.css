@@ -12,11 +12,23 @@ body {
     #060912;
   color: #e5e7eb;
   min-height: 100vh;
+  /* Em mobile, o chrome do browser muda de altura ao rolar — dvh fica
+     mais estável que vh. Fallback pra vh em browsers antigos. */
+  min-height: 100dvh;
+  /* Evita zoom em iOS quando o input vira foco (faz auto-zoom se font<16px).
+     Mantemos a fonte do app pequena, mas o body fica 16 pra inputs. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* Sem rolagem horizontal indesejada — kanban tem scroll próprio */
+  overflow-x: hidden;
 }
 
 /* Custom scrollbar for column lists */
 .col-scroll::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 .col-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.08);
@@ -24,4 +36,28 @@ body {
 }
 .col-scroll::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* iOS-style snap scroll horizontal pro kanban em mobile */
+.snap-x-cards {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.snap-x-cards > * {
+  scroll-snap-align: start;
+}
+
+/* Inputs em iOS: previne auto-zoom (precisa font-size ≥ 16px). Usamos
+   classe explícita pra não inflar todos os 11px do app. */
+.no-ios-zoom {
+  font-size: 16px;
+}
+
+/* Safe area pra iPhones com notch */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top);
 }

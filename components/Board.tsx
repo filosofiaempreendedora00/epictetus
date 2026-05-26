@@ -641,11 +641,11 @@ export default function Board() {
       {viewMode === "tarefas" ? (
         <TasksView searchTerm={searchTerm} />
       ) : loading ? (
-        <div className="px-6 py-10 text-white/80 text-sm">
+        <div className="px-3 sm:px-6 py-10 text-white/80 text-sm">
           Carregando negócios do Bitrix…
         </div>
       ) : error ? (
-        <div className="mx-6 my-6 rounded-lg border border-red-400/40 bg-red-500/10 p-4 text-sm text-red-100">
+        <div className="mx-3 sm:mx-6 my-6 rounded-lg border border-red-400/40 bg-red-500/10 p-4 text-sm text-red-100">
           <div className="font-medium mb-1">Não consegui conectar ao Bitrix</div>
           <div className="opacity-80">{error}</div>
         </div>
@@ -657,7 +657,7 @@ export default function Board() {
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 overflow-x-auto px-6 pb-6 col-scroll">
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto px-3 sm:px-6 pb-6 col-scroll snap-x-cards sm:snap-none">
             {state.columns.map((col, idx) => {
               const visibleIds = filterCardIds(col.cardIds);
               return (

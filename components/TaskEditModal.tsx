@@ -468,7 +468,8 @@ export default function TaskEditModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      // Mobile full-screen / desktop centralizado
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-stretch sm:items-center justify-center p-0 sm:p-4"
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => {
@@ -476,15 +477,15 @@ export default function TaskEditModal({
       }}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden cursor-default"
+        className="bg-white shadow-2xl w-full sm:max-w-md flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-xl overflow-hidden cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="safe-top px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
           <h2 className="text-base font-semibold text-slate-900">{heading}</h2>
           <button
             onClick={onClose}
             disabled={busy}
-            className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-6 h-6 flex items-center justify-center"
+            className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-10 h-10 sm:w-6 sm:h-6 flex items-center justify-center -mr-2 sm:mr-0"
             title="Fechar"
             aria-label="Fechar"
           >
@@ -492,7 +493,7 @@ export default function TaskEditModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
+        <div className="px-4 sm:px-5 py-4 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
               Nome da tarefa
@@ -503,7 +504,7 @@ export default function TaskEditModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={busy}
-              className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
+              className="w-full text-base sm:text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2.5 sm:py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
             />
             {taskType && TASK_TYPE_INFO[taskType as TaskType].prefix && (
               <div className="text-[10px] text-slate-400 mt-1">
@@ -576,7 +577,7 @@ export default function TaskEditModal({
             <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
               Prazo
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <input
                 type="date"
                 value={dlDate}
@@ -584,7 +585,8 @@ export default function TaskEditModal({
                   setDeadline(joinLocal(e.target.value, dlHour, dlMinute))
                 }
                 disabled={busy}
-                className="flex-1 text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
+                // text-base mobile pra não auto-zoom no iOS
+                className="flex-1 min-w-[140px] text-base sm:text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2.5 sm:py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50"
               />
               <HourPicker
                 value={dlHour}
@@ -619,9 +621,9 @@ export default function TaskEditModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={busy}
-              rows={6}
+              rows={4}
               placeholder="Mais detalhes sobre a tarefa…"
-              className="w-full text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 resize-y disabled:bg-slate-50"
+              className="w-full text-base sm:text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 resize-y disabled:bg-slate-50"
             />
           </div>
 
@@ -632,12 +634,12 @@ export default function TaskEditModal({
           )}
         </div>
 
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+        <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 sm:gap-3 flex-wrap shrink-0 safe-bottom">
           {onComplete ? (
             <button
               onClick={handleComplete}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition disabled:opacity-50 font-medium"
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 sm:py-1.5 text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition disabled:opacity-50 font-medium"
               title="Marca a tarefa como concluída no Bitrix e remove daqui"
             >
               <svg
@@ -652,7 +654,13 @@ export default function TaskEditModal({
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              {completing ? "Concluindo…" : "Marcar como concluída"}
+              {/* Texto curto em mobile, longo em desktop */}
+              <span className="hidden sm:inline">
+                {completing ? "Concluindo…" : "Marcar como concluída"}
+              </span>
+              <span className="sm:hidden">
+                {completing ? "Concluindo…" : "Concluir"}
+              </span>
             </button>
           ) : (
             <span />
@@ -661,14 +669,14 @@ export default function TaskEditModal({
             <button
               onClick={onClose}
               disabled={busy}
-              className="px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
+              className="px-4 py-2.5 sm:py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={busy}
-              className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
+              className="px-4 py-2.5 sm:py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
             >
               {saving ? "Salvando…" : saveLabel}
             </button>

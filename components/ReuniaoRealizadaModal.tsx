@@ -111,7 +111,7 @@ export default function ReuniaoRealizadaModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-stretch sm:items-center justify-center p-0 sm:p-4"
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => {
@@ -119,13 +119,15 @@ export default function ReuniaoRealizadaModal({
       }}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden cursor-default flex flex-col max-h-[92vh]"
+        className="bg-white shadow-2xl w-full sm:max-w-2xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-xl overflow-hidden cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between shrink-0 gap-3">
+        <div className="safe-top px-4 sm:px-5 py-4 border-b border-slate-100 flex items-start justify-between shrink-0 gap-3">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-slate-900">
-              Sair de "Reunião realizada" → {targetStageName}
+              <span className="hidden sm:inline">Sair de "Reunião realizada" → </span>
+              <span className="sm:hidden">Mover para </span>
+              {targetStageName}
             </h2>
             <div className="text-[11px] text-slate-500 mt-0.5 break-words">
               {cardTitle}
@@ -134,7 +136,7 @@ export default function ReuniaoRealizadaModal({
           <button
             onClick={onCancel}
             disabled={saving}
-            className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-6 h-6 flex items-center justify-center shrink-0"
+            className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-10 h-10 sm:w-6 sm:h-6 flex items-center justify-center shrink-0 -mr-2 sm:mr-0"
             title="Cancelar"
             aria-label="Cancelar"
           >
@@ -142,7 +144,7 @@ export default function ReuniaoRealizadaModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4 overflow-y-auto">
+        <div className="px-4 sm:px-5 py-4 space-y-4 overflow-y-auto flex-1">
           <div className="text-[12px] text-slate-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
             Preencha todos os campos abaixo para avançar de etapa. Tudo é
             obrigatório.
@@ -167,20 +169,20 @@ export default function ReuniaoRealizadaModal({
           )}
         </div>
 
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+        <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0 safe-bottom">
           <button
             onClick={onCancel}
             disabled={saving}
-            className="px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
+            className="px-4 py-2.5 sm:py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
+            className="px-4 py-2.5 sm:py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
           >
-            {saving ? "Salvando…" : "Avançar de etapa"}
+            {saving ? "Salvando…" : "Avançar"}
           </button>
         </div>
       </div>

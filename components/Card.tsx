@@ -121,7 +121,7 @@ function MoneyRow({
               setEditing(false);
             }
           }}
-          className="w-20 text-[12px] px-1.5 py-0.5 border border-sky-400 rounded outline-none text-slate-900"
+          className="w-24 text-base sm:text-[12px] px-2 py-1 sm:px-1.5 sm:py-0.5 border border-sky-400 rounded outline-none text-slate-900"
         />
       </div>
     );
@@ -144,11 +144,12 @@ function MoneyRow({
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={startEdit}
-          className="opacity-25 hover:opacity-100 transition text-slate-500 hover:text-sky-600"
+          // Mobile: mais visível (50%); desktop: discreto (25%) e brilha no hover
+          className="w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center opacity-50 sm:opacity-25 hover:opacity-100 transition text-slate-500 hover:text-sky-600"
           title={`Editar Valor ${label}`}
           aria-label={`Editar Valor ${label}`}
         >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
           </svg>
         </button>
@@ -269,13 +270,14 @@ export default function Card({
         }}
         className="group bg-white rounded-xl shadow-sm px-3 py-2.5 cursor-grab active:cursor-grabbing relative overflow-hidden hover:shadow-md transition"
       >
-        {/* WhatsApp — copia telefone do contato */}
+        {/* WhatsApp — copia telefone do contato. Touch area mais generosa
+            (32x32) com padding pra ser fácil de tocar em mobile. */}
         {card.phone && (
           <button
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={handleCopyPhone}
-            className="absolute top-1.5 right-2 opacity-75 hover:opacity-100 text-[#25D366] hover:text-[#1ebe5d] transition"
+            className="absolute top-0.5 right-0.5 w-8 h-8 flex items-center justify-center opacity-75 hover:opacity-100 text-[#25D366] hover:text-[#1ebe5d] transition"
             title={`Copiar telefone (${card.phone})`}
             aria-label="Copiar telefone para WhatsApp"
           >
@@ -285,7 +287,7 @@ export default function Card({
           </button>
         )}
 
-        {/* Delete (visible on hover) */}
+        {/* Delete — opacidade total em mobile (sem hover), só hover em desktop */}
         {onDelete && (
           <button
             onPointerDown={(e) => e.stopPropagation()}
@@ -293,10 +295,11 @@ export default function Card({
               e.stopPropagation();
               onDelete();
             }}
-            className={`absolute top-1.5 ${
-              card.phone ? "right-8" : "right-2"
-            } opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500 text-xs`}
+            className={`absolute top-0.5 ${
+              card.phone ? "right-9" : "right-0.5"
+            } w-7 h-7 flex items-center justify-center opacity-50 sm:opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500 text-xs`}
             title="Excluir"
+            aria-label="Excluir"
           >
             ✕
           </button>
@@ -400,7 +403,7 @@ export default function Card({
                     }
                   }}
                   placeholder="https://…"
-                  className="flex-1 min-w-0 text-[11px] px-1.5 py-0.5 border border-sky-400 rounded outline-none text-slate-900"
+                  className="flex-1 min-w-0 text-base sm:text-[11px] px-2 py-1 sm:px-1.5 sm:py-0.5 border border-sky-400 rounded outline-none text-slate-900"
                 />
               </div>
             ) : card.proposalLink ? (
@@ -424,11 +427,11 @@ export default function Card({
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={startEditProposal}
-                  className="opacity-30 hover:opacity-100 transition text-slate-500 hover:text-sky-600 shrink-0"
+                  className="w-6 h-6 flex items-center justify-center opacity-50 sm:opacity-30 hover:opacity-100 transition text-slate-500 hover:text-sky-600 shrink-0"
                   title="Editar link"
                   aria-label="Editar link da proposta"
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                   </svg>
                 </button>

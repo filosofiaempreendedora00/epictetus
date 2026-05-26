@@ -44,7 +44,9 @@ export default function Column({
   });
 
   return (
-    <div className="flex flex-col w-[230px] shrink-0">
+    // Em mobile a coluna ocupa ~85vw (snap-scroll mostra ~1 por tela);
+    // em ≥sm volta pra 230px fixo do desktop.
+    <div className="flex flex-col w-[85vw] max-w-[300px] sm:w-[230px] shrink-0">
       {/* Gradient header */}
       <div
         className={`bg-gradient-to-r ${column.color} rounded-t-2xl px-4 py-3 flex items-center justify-between shadow-md`}
