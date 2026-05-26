@@ -34,8 +34,13 @@ import type { TaskType } from "./taskTypes";
 //   "Próxima semana"              → adiciona ?semana=1
 //   "Criar tarefa amanhã"         → /tarefas/nova/amanha
 //   "Criar tarefa amanhã do Luma" → /tarefas/nova/amanha/luma
+//
+// Reuniões (Google Agenda):
+//   /reunioes                          → semanal (default)
+//   /reunioes/semanal | duas-semanas
+//   "Reuniões duas semanas"            → /reunioes/duas-semanas
 
-export type ViewMode = "negocios" | "tarefas";
+export type ViewMode = "negocios" | "tarefas" | "reunioes";
 export type DateView = "weekly" | "biweekly" | "monthly";
 export type TypeFilter = "ALL" | TaskType;
 export type ModalKind = "editarNegocio" | "novaTarefa" | null;
@@ -150,6 +155,15 @@ export function parseRoute(
     return route;
   }
 
+  if (segs[0] === "reunioes") {
+    route.view = "reunioes";
+    // Reuniões só usa weekly/biweekly (mensal não faz sentido pra Meet).
+    if (segs[1] && PERIODO_TO_DATEVIEW[segs[1]]) {
+      route.dateView = PERIODO_TO_DATEVIEW[segs[1]];
+    }
+    return route;
+  }
+
   return route;
 }
 
@@ -178,6 +192,12 @@ export function buildRoute(route: AppRoute): string {
           segs.push(FILTER_TO_SEGMENT[route.typeFilter as Exclude<TypeFilter, "ALL">]);
         }
       }
+    }
+  } else if (route.view === "reunioes") {
+    segs.push("reunioes");
+    // Só explicita o período quando não for o default (weekly).
+    if (route.dateView !== "weekly") {
+      segs.push(DATEVIEW_TO_PERIODO[route.dateView]);
     }
   }
 

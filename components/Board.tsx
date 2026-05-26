@@ -19,6 +19,7 @@ import Column from "./Column";
 import Card from "./Card";
 import Header from "./Header";
 import TasksView from "./TasksView";
+import MeetingsView from "./MeetingsView";
 import CongeladoModal from "./CongeladoModal";
 import ReuniaoRealizadaModal from "./ReuniaoRealizadaModal";
 import DealEditModal from "./DealEditModal";
@@ -640,6 +641,8 @@ export default function Board() {
 
       {viewMode === "tarefas" ? (
         <TasksView searchTerm={searchTerm} />
+      ) : viewMode === "reunioes" ? (
+        <MeetingsView />
       ) : loading ? (
         <div className="px-3 sm:px-6 py-10 text-white/80 text-sm">
           Carregando negócios do Bitrix…
