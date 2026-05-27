@@ -144,26 +144,34 @@ export default function ReuniaoRealizadaModal({
           </button>
         </div>
 
-        <div className="px-4 sm:px-5 py-4 space-y-4 overflow-y-auto flex-1">
-          <div className="text-[12px] text-slate-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+        <div className="px-4 sm:px-5 py-4 overflow-y-auto flex-1">
+          <div className="text-[12px] text-slate-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4">
             Preencha todos os campos abaixo para avançar de etapa. Tudo é
             obrigatório.
           </div>
 
-          {REUNIAO_FIELDS.map((f) => (
-            <FieldRow
-              key={f.key}
-              field={f}
-              value={values[f.key]}
-              options={fieldOptions[f.key] || []}
-              disabled={saving}
-              onChange={(v) => setField(f.key, v)}
-              onToggleMulti={(id) => toggleMulti(f.key, id)}
-            />
-          ))}
+          {/* Grid 1-col em mobile / 2-col em desktop. Campos textarea
+              (só o "Plano de ação") spanam as 2 colunas pra dar espaço. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+            {REUNIAO_FIELDS.map((f) => (
+              <div
+                key={f.key}
+                className={f.type === "textarea" ? "sm:col-span-2" : ""}
+              >
+                <FieldRow
+                  field={f}
+                  value={values[f.key]}
+                  options={fieldOptions[f.key] || []}
+                  disabled={saving}
+                  onChange={(v) => setField(f.key, v)}
+                  onToggleMulti={(id) => toggleMulti(f.key, id)}
+                />
+              </div>
+            ))}
+          </div>
 
           {error && (
-            <div className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded px-2.5 py-1.5">
+            <div className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded px-2.5 py-1.5 mt-4">
               {error}
             </div>
           )}
