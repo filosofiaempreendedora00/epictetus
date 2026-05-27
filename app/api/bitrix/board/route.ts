@@ -92,10 +92,19 @@ async function fetchEnumOptions(fieldName: string): Promise<EnumOption[]> {
   });
   const field = fields?.[0];
   const list = field?.LIST || [];
-  return list.map((item: any) => ({
+  const out = list.map((item: any) => ({
     id: String(item.ID),
     value: String(item.VALUE),
   }));
+  if (out.length === 0) {
+    // Loga visível no Render — facilita diagnosticar quando o modal abre
+    // sem botões. Causa típica: rate limit do Bitrix engoliu a chamada
+    // do userfield.list (apesar do retry).
+    console.warn(
+      `[fetchEnumOptions] LIST vazio pro field ${fieldName} — verifique rate limit ou campo no Bitrix.`
+    );
+  }
+  return out;
 }
 
 function parseMoneyField(raw: unknown): number {

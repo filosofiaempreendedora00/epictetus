@@ -785,25 +785,113 @@ export default function Board() {
         </DndContext>
       )}
 
-      {pendingCongelado && state.loseFieldOptions && (
-        <CongeladoModal
-          cardTitle={state.cards[pendingCongelado.cardId]?.title || ""}
-          motivoOptions={state.loseFieldOptions.motivo}
-          servicosOptions={state.loseFieldOptions.servicos}
-          onCancel={handleCancelCongelado}
-          onConfirm={handleConfirmCongelado}
-        />
-      )}
+      {pendingCongelado &&
+        (() => {
+          // Validação defensiva: se os enum-options vieram vazios (cache
+          // ruim, rate limit do Bitrix, etc.), avisa o usuário em vez de
+          // mostrar modal sem botões — situação que parecia "bug".
+          const opts = state.loseFieldOptions;
+          const hasFields =
+            opts && opts.motivo?.length > 0 && opts.servicos?.length > 0;
+          if (!hasFields) {
+            return (
+              <div
+                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                onClick={handleCancelCongelado}
+              >
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
+                  <h2 className="text-base font-semibold text-slate-900 mb-2">
+                    Opções de "Congelar" indisponíveis
+                  </h2>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Não consegui carregar as listas de "Motivo de perda" e
+                    "Serviços mapeados" do Bitrix (geralmente acontece por
+                    rate limit ou cold start). Atualize a página e tente
+                    novamente em alguns segundos.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={handleCancelCongelado}
+                      className="px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-md transition"
+                    >
+                      Fechar
+                    </button>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition font-medium"
+                    >
+                      Recarregar página
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <CongeladoModal
+              cardTitle={state.cards[pendingCongelado.cardId]?.title || ""}
+              motivoOptions={opts!.motivo}
+              servicosOptions={opts!.servicos}
+              onCancel={handleCancelCongelado}
+              onConfirm={handleConfirmCongelado}
+            />
+          );
+        })()}
 
-      {pendingReuniaoExit && state.reuniaoFieldOptions && (
-        <ReuniaoRealizadaModal
-          cardTitle={state.cards[pendingReuniaoExit.cardId]?.title || ""}
-          targetStageName={pendingReuniaoExit.targetStageName}
-          fieldOptions={state.reuniaoFieldOptions}
-          onCancel={handleCancelReuniaoExit}
-          onConfirm={handleConfirmReuniaoExit}
-        />
-      )}
+      {pendingReuniaoExit &&
+        (() => {
+          const opts = state.reuniaoFieldOptions;
+          // Sanity-check igual ao Congelado: ao menos UM enum precisa ter
+          // opções carregadas, caso contrário o modal aparece sem botões
+          // e parece "quebrado" pro usuário.
+          const totalOptions = opts
+            ? Object.values(opts).reduce(
+                (sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0),
+                0
+              )
+            : 0;
+          if (!opts || totalOptions === 0) {
+            return (
+              <div
+                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                onClick={handleCancelReuniaoExit}
+              >
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
+                  <h2 className="text-base font-semibold text-slate-900 mb-2">
+                    Opções da Reunião indisponíveis
+                  </h2>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Não consegui carregar as listas de opções (rate limit
+                    do Bitrix). Recarregue a página e tente de novo.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={handleCancelReuniaoExit}
+                      className="px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-md transition"
+                    >
+                      Fechar
+                    </button>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition font-medium"
+                    >
+                      Recarregar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <ReuniaoRealizadaModal
+              cardTitle={state.cards[pendingReuniaoExit.cardId]?.title || ""}
+              targetStageName={pendingReuniaoExit.targetStageName}
+              fieldOptions={opts}
+              onCancel={handleCancelReuniaoExit}
+              onConfirm={handleConfirmReuniaoExit}
+            />
+          );
+        })()}
 
       {pendingAguardandoDados && (
         <AguardandoDadosModal

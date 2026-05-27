@@ -81,6 +81,13 @@ function getCached<T>(method: string, params: Record<string, any>): T | undefine
 }
 
 function setCached(method: string, params: Record<string, any>, value: any): void {
+  // Não cacheia resultado "vazio" — esses casos são quase sempre por
+  // rate limit transitório ou erro silencioso do Bitrix. Cachear vazio
+  // por 5 min causa bugs sutis (ex.: modal Congelado renderiza sem opções
+  // porque userfield.list voltou []).
+  if (value == null) return;
+  if (Array.isArray(value) && value.length === 0) return;
+  if (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0) return;
   metaCache.set(cacheKey(method, params), {
     value,
     expiresAt: Date.now() + META_TTL_MS,
