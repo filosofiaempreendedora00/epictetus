@@ -31,6 +31,7 @@ import {
   type ViewMode,
 } from "@/lib/route";
 import { findDealByQuery } from "@/lib/dateParams";
+import { useSessionState } from "@/lib/useSessionState";
 
 const LOSE_STAGE_ID = "LOSE";
 const NEW_STAGE_ID = "NEW";
@@ -50,22 +51,27 @@ export default function Board() {
   const setSearchTerm = (v: string) => setRoute({ busca: v });
   const setViewMode = (v: ViewMode) => setRoute({ view: v });
   const [dragOriginColId, setDragOriginColId] = useState<string | null>(null);
-  const [pendingCongelado, setPendingCongelado] = useState<{
-    cardId: string;
-    originColId: string;
-  } | null>(null);
-  const [pendingReuniaoExit, setPendingReuniaoExit] = useState<{
+  // Os 3 pending* states ficam em sessionStorage pra sobreviver ao
+  // remount do Board (o catch-all [[...slug]] do App Router remonta o
+  // componente quando o pathname muda — ex.: ao fechar o DealEditModal
+  // depois de selecionar "Congelado", URL volta de /negocios/<slug> pra /
+  // e o Board remontava com pendingCongelado=null, modal nunca abria).
+  const [pendingCongelado, setPendingCongelado] =
+    useSessionState<{ cardId: string; originColId: string } | null>(
+      "epictetus.pendingCongelado",
+      null
+    );
+  const [pendingReuniaoExit, setPendingReuniaoExit] = useSessionState<{
     cardId: string;
     originColId: string;
     targetStageId: string;
     targetStageName: string;
-  } | null>(null);
-  // Mover pra "Aguardado os dados" exige preencher briefing + link do
-  // contrato — análogo ao fluxo de Congelado/ReuniaoExit.
-  const [pendingAguardandoDados, setPendingAguardandoDados] = useState<{
-    cardId: string;
-    originColId: string;
-  } | null>(null);
+  } | null>("epictetus.pendingReuniaoExit", null);
+  const [pendingAguardandoDados, setPendingAguardandoDados] =
+    useSessionState<{ cardId: string; originColId: string } | null>(
+      "epictetus.pendingAguardandoDados",
+      null
+    );
 
   // Fetch board from Bitrix on mount
   useEffect(() => {
@@ -787,9 +793,10 @@ export default function Board() {
 
       {pendingCongelado &&
         (() => {
-          // Validação defensiva: se os enum-options vieram vazios (cache
-          // ruim, rate limit do Bitrix, etc.), avisa o usuário em vez de
-          // mostrar modal sem botões — situação que parecia "bug".
+          // Se o board ainda está carregando (remount após mudança de URL,
+          // por exemplo), espera os dados chegarem antes de decidir entre
+          // modal real ou fallback "indisponível".
+          if (loading) return null;
           const opts = state.loseFieldOptions;
           const hasFields =
             opts && opts.motivo?.length > 0 && opts.servicos?.length > 0;
@@ -840,6 +847,7 @@ export default function Board() {
 
       {pendingReuniaoExit &&
         (() => {
+          if (loading) return null;
           const opts = state.reuniaoFieldOptions;
           // Sanity-check igual ao Congelado: ao menos UM enum precisa ter
           // opções carregadas, caso contrário o modal aparece sem botões
