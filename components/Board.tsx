@@ -22,6 +22,7 @@ import TasksView from "./TasksView";
 import MeetingsView from "./MeetingsView";
 import CongeladoModal from "./CongeladoModal";
 import ReuniaoRealizadaModal from "./ReuniaoRealizadaModal";
+import AguardandoDadosModal from "./AguardandoDadosModal";
 import DealEditModal from "./DealEditModal";
 import {
   closeModal,
@@ -33,6 +34,8 @@ import { findDealByQuery } from "@/lib/dateParams";
 
 const LOSE_STAGE_ID = "LOSE";
 const NEW_STAGE_ID = "NEW";
+// Stage que exige briefing + link do contrato pra entrar
+const AGUARDANDO_DADOS_STAGE_ID = "UC_YN6AV9";
 
 const EMPTY_STATE: BoardState = { columns: [], cards: {} };
 
@@ -56,6 +59,12 @@ export default function Board() {
     originColId: string;
     targetStageId: string;
     targetStageName: string;
+  } | null>(null);
+  // Mover pra "Aguardado os dados" exige preencher briefing + link do
+  // contrato — análogo ao fluxo de Congelado/ReuniaoExit.
+  const [pendingAguardandoDados, setPendingAguardandoDados] = useState<{
+    cardId: string;
+    originColId: string;
   } | null>(null);
 
   // Fetch board from Bitrix on mount
@@ -137,15 +146,18 @@ export default function Board() {
       );
 
       // Push the stage change to Bitrix (fire and forget — optimistic UI)
-      // EXCETO se for Congelado ou saída de "Reunião realizada":
-      // aguardamos os modais preencherem os campos obrigatórios.
+      // EXCETO se for Congelado, saída de "Reunião realizada", ou entrada
+      // em "Aguardado os dados": esses três têm campos obrigatórios que
+      // o usuário precisa preencher num modal antes da gente persistir.
       const card = prev.cards[activeId];
       const targetCol = newColumns.find((c) => c.id === toColId);
       const fromColStageId = prev.columns.find((c) => c.id === fromColId)?.stageId;
       const isLose = targetCol?.stageId === LOSE_STAGE_ID;
       const isExitingReuniao =
         fromColStageId === NEW_STAGE_ID && targetCol?.stageId !== NEW_STAGE_ID;
-      if (!isLose && !isExitingReuniao && card?.bitrixId && targetCol?.stageId) {
+      const isAguardandoDados =
+        targetCol?.stageId === AGUARDANDO_DADOS_STAGE_ID;
+      if (!isLose && !isExitingReuniao && !isAguardandoDados && card?.bitrixId && targetCol?.stageId) {
         fetch(`/api/bitrix/deals/${card.bitrixId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -195,6 +207,18 @@ export default function Board() {
         targetStageId: finalCol.stageId!,
         targetStageName: finalCol.title,
       });
+      return;
+    }
+
+    // Se foi parar em "Aguardado os dados" vindo de outra coluna, abre o
+    // modal pra preencher briefing + link do contrato (campos obrigatórios
+    // do Bitrix pra essa etapa).
+    if (
+      finalCol?.stageId === AGUARDANDO_DADOS_STAGE_ID &&
+      origin &&
+      origin !== finalColId
+    ) {
+      setPendingAguardandoDados({ cardId: activeId, originColId: origin });
       return;
     }
 
@@ -254,6 +278,12 @@ export default function Board() {
         targetStageId: newStageId,
         targetStageName: toCol.title,
       });
+      return;
+    }
+
+    // Entrar em "Aguardado os dados" exige briefing + link do contrato
+    if (newStageId === AGUARDANDO_DADOS_STAGE_ID) {
+      setPendingAguardandoDados({ cardId, originColId: fromCol.id });
       return;
     }
 
@@ -370,6 +400,62 @@ export default function Board() {
       setState((s) => moveCardBetweenColumns(s, cardId, currentColId, originColId));
     }
     setPendingCongelado(null);
+  }
+
+  async function handleConfirmAguardandoDados(fields: {
+    briefingProjeto: string;
+    linkContrato: string;
+  }) {
+    if (!pendingAguardandoDados) return;
+    const { cardId, originColId } = pendingAguardandoDados;
+    const card = state.cards[cardId];
+    if (!card?.bitrixId) return;
+
+    // Visualmente move o card pra coluna "Aguardado os dados" se ainda
+    // não tá lá (caso o trigger tenha vindo do dropdown do DealEditModal,
+    // não do drag).
+    const targetCol = state.columns.find(
+      (c) => c.stageId === AGUARDANDO_DADOS_STAGE_ID
+    );
+    const currentColId = findColumnIdByCard(cardId);
+    if (targetCol && currentColId && currentColId !== targetCol.id) {
+      setState((s) => moveCardBetweenColumns(s, cardId, currentColId, targetCol.id));
+    }
+
+    try {
+      const res = await fetch(`/api/bitrix/deals/${card.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stageId: AGUARDANDO_DADOS_STAGE_ID,
+          briefingProjeto: fields.briefingProjeto,
+          linkContrato: fields.linkContrato,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao salvar no Bitrix");
+      }
+      setPendingAguardandoDados(null);
+    } catch (e: any) {
+      // Rollback: volta pra coluna de origem
+      const nowColId = findColumnIdByCard(cardId);
+      if (nowColId && nowColId !== originColId) {
+        setState((s) => moveCardBetweenColumns(s, cardId, nowColId, originColId));
+      }
+      setPendingAguardandoDados(null);
+      throw e;
+    }
+  }
+
+  function handleCancelAguardandoDados() {
+    if (!pendingAguardandoDados) return;
+    const { cardId, originColId } = pendingAguardandoDados;
+    const currentColId = findColumnIdByCard(cardId);
+    if (currentColId && currentColId !== originColId) {
+      setState((s) => moveCardBetweenColumns(s, cardId, currentColId, originColId));
+    }
+    setPendingAguardandoDados(null);
   }
 
   async function handleConfirmReuniaoExit(reuniaoData: Record<string, any>) {
@@ -716,6 +802,14 @@ export default function Board() {
           fieldOptions={state.reuniaoFieldOptions}
           onCancel={handleCancelReuniaoExit}
           onConfirm={handleConfirmReuniaoExit}
+        />
+      )}
+
+      {pendingAguardandoDados && (
+        <AguardandoDadosModal
+          cardTitle={state.cards[pendingAguardandoDados.cardId]?.title || ""}
+          onCancel={handleCancelAguardandoDados}
+          onConfirm={handleConfirmAguardandoDados}
         />
       )}
 

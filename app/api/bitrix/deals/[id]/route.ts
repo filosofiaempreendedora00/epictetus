@@ -10,6 +10,9 @@ const FIELD_MOTIVO_PERDA = "UF_CRM_1771965137";
 const FIELD_DESCRICAO_PERDA = "UF_CRM_1753447633";
 const FIELD_SERVICOS_MAPEADOS = "UF_CRM_1772734873";
 const FIELD_PROPOSAL_LINK = "UF_CRM_1758580725895";
+// Aguardando Dados (UC_YN6AV9): briefing do projeto + link do contrato
+const FIELD_BRIEFING_PROJETO = "UF_CRM_1753447532";
+const FIELD_LINK_CONTRATO = "UF_CRM_1760536219";
 
 export async function PATCH(
   req: Request,
@@ -39,6 +42,13 @@ export async function PATCH(
     }
     if (typeof body.proposalLink === "string") {
       fields[FIELD_PROPOSAL_LINK] = body.proposalLink.trim();
+    }
+    // Campos pra mover pra "Aguardado os dados"
+    if (typeof body.briefingProjeto === "string") {
+      fields[FIELD_BRIEFING_PROJETO] = body.briefingProjeto;
+    }
+    if (typeof body.linkContrato === "string") {
+      fields[FIELD_LINK_CONTRATO] = body.linkContrato.trim();
     }
 
     // Campos da Reunião realizada (15 campos obrigatórios pra avançar de etapa)
