@@ -67,15 +67,17 @@ export default function DealEditModal({
         className="bg-white shadow-2xl w-full sm:max-w-md flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-xl overflow-hidden cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="safe-top px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <h2 className="text-base font-semibold text-slate-900">
+        <div className="safe-top px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900">
             Editar negócio
           </h2>
           <button
             onClick={onClose}
             disabled={saving}
-            // Touch area ≥40px em mobile
-            className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-10 h-10 sm:w-6 sm:h-6 flex items-center justify-center -mr-2 sm:mr-0"
+            // Touch area ≥40px em mobile; -mr-1 sm:-mr-2 ajusta pra
+            // alinhar visualmente com o título (área de toque maior que
+            // o ícone).
+            className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-10 h-10 flex items-center justify-center -mr-2"
             title="Fechar"
             aria-label="Fechar"
           >
@@ -83,18 +85,18 @@ export default function DealEditModal({
           </button>
         </div>
 
-        <div className="px-4 sm:px-5 py-4 space-y-4 overflow-y-auto flex-1">
+        <div className="px-5 sm:px-6 py-5 sm:py-6 space-y-5 sm:space-y-6 overflow-y-auto flex-1">
           <div>
-            <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+            <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-2">
               Negócio
             </label>
-            <div className="text-sm text-slate-900 break-words bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+            <div className="text-sm text-slate-900 break-words bg-slate-50 border border-slate-100 rounded-lg px-3.5 py-2.5">
               {cardTitle}
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+            <label className="block text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-2">
               Fase do funil
             </label>
             <select
@@ -102,7 +104,7 @@ export default function DealEditModal({
               onChange={(e) => setStageId(e.target.value)}
               disabled={saving}
               // text-base em mobile pra evitar zoom do iOS
-              className="w-full text-base sm:text-sm text-slate-900 border border-slate-200 rounded-lg px-3 py-2.5 sm:py-2 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 bg-white"
+              className="w-full text-base sm:text-sm text-slate-900 border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 disabled:bg-slate-50 bg-white"
             >
               {stages.map((s) => (
                 <option key={s.stageId} value={s.stageId}>
@@ -110,31 +112,31 @@ export default function DealEditModal({
                 </option>
               ))}
             </select>
-            <div className="text-[11px] text-slate-400 mt-1">
+            <div className="text-[11px] text-slate-400 mt-2">
               Alterar move o card para a coluna correspondente.
             </div>
           </div>
 
           {error && (
-            <div className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded px-2.5 py-1.5">
+            <div className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
               {error}
             </div>
           )}
         </div>
 
-        <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0 safe-bottom">
+        <div className="px-5 sm:px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0 safe-bottom">
           <button
             onClick={onClose}
             disabled={saving}
             // Touch target ≥44px em mobile
-            className="px-4 py-2.5 sm:py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
+            className="px-4 py-2 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2.5 sm:py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
+            className="px-5 py-2 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
           >
             {saving ? "Salvando…" : "Salvar"}
           </button>
