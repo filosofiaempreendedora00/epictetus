@@ -1,6 +1,6 @@
 "use client";
 
-export type ViewMode = "negocios" | "tarefas" | "reunioes";
+export type ViewMode = "negocios" | "tarefas" | "reunioes" | "dash";
 
 type Props = {
   searchTerm: string;
@@ -20,10 +20,12 @@ export default function Header({
       ? "Tarefas do Roberto"
       : viewMode === "reunioes"
       ? "Reuniões do Roberto"
+      : viewMode === "dash"
+      ? "Dashboard do Roberto"
       : "Negócios do Roberto";
   // Busca só faz sentido pra negócios/tarefas (filtra a lista). Em reuniões
-  // não temos esse search-bar (eventos não são filtrados localmente).
-  const showSearch = viewMode !== "reunioes";
+  // e dash não temos esse search-bar.
+  const showSearch = viewMode !== "reunioes" && viewMode !== "dash";
 
   return (
     <header className="px-3 sm:px-6 pt-3 sm:pt-6 pb-3">
@@ -101,6 +103,16 @@ export default function Header({
           }`}
         >
           Reuniões
+        </button>
+        <button
+          onClick={() => onViewModeChange("dash")}
+          className={`px-3 sm:px-3 py-2 sm:py-1 text-[13px] rounded-md transition ${
+            viewMode === "dash"
+              ? "bg-white/15 text-white font-medium shadow-sm"
+              : "text-white/55 hover:text-white/85"
+          }`}
+        >
+          Dashboard
         </button>
       </div>
     </header>

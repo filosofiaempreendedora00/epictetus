@@ -20,6 +20,7 @@ import Card from "./Card";
 import Header from "./Header";
 import TasksView from "./TasksView";
 import MeetingsView from "./MeetingsView";
+import DashView from "./DashView";
 import CongeladoModal from "./CongeladoModal";
 import ReuniaoRealizadaModal from "./ReuniaoRealizadaModal";
 import AguardandoDadosModal from "./AguardandoDadosModal";
@@ -735,6 +736,8 @@ export default function Board() {
         <TasksView searchTerm={searchTerm} />
       ) : viewMode === "reunioes" ? (
         <MeetingsView />
+      ) : viewMode === "dash" ? (
+        <DashView />
       ) : loading ? (
         <div className="px-3 sm:px-6 py-10 text-white/80 text-sm">
           Carregando negócios do Bitrix…

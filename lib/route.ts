@@ -39,8 +39,15 @@ import type { TaskType } from "./taskTypes";
 //   /reunioes                          → semanal (default)
 //   /reunioes/semanal | duas-semanas
 //   "Reuniões duas semanas"            → /reunioes/duas-semanas
+//
+// Dashboard (vendas do Roberto, etapa Negócio Ganho):
+//   /dash                              → últimos 12 meses
+//   /dash/<ano>                        → ex.: /dash/2026 = ano calendário
+//   ?de=YYYY-MM-DD&ate=YYYY-MM-DD      → range customizado (sobrepõe path)
+//   "Dashboard"                        → /dash
+//   "Dashboard 2025"                   → /dash/2025
 
-export type ViewMode = "negocios" | "tarefas" | "reunioes";
+export type ViewMode = "negocios" | "tarefas" | "reunioes" | "dash";
 export type DateView = "weekly" | "biweekly" | "monthly";
 export type TypeFilter = "ALL" | TaskType;
 export type ModalKind = "editarNegocio" | "novaTarefa" | null;
@@ -54,6 +61,10 @@ export type AppRoute = {
   dia: string;          // hoje | amanha | ontem | YYYY-MM-DD | ""
   busca: string;        // texto de busca
   weekOffset: number;   // ?semana=N
+  // Dashboard (só aplicável quando view === "dash"):
+  dashAno: number | null;   // /dash/<ano> ou null pra "últimos 12 meses"
+  dashDe: string;           // ?de=YYYY-MM-DD (range customizado)
+  dashAte: string;          // ?ate=YYYY-MM-DD
 };
 
 const PERIODO_TO_DATEVIEW: Record<string, DateView> = {
@@ -102,6 +113,9 @@ const EMPTY_ROUTE: AppRoute = {
   dia: "",
   busca: "",
   weekOffset: 0,
+  dashAno: null,
+  dashDe: "",
+  dashAte: "",
 };
 
 export function parseRoute(
@@ -112,6 +126,8 @@ export function parseRoute(
     ...EMPTY_ROUTE,
     busca: searchParams.get("busca") || "",
     weekOffset: parseInt(searchParams.get("semana") || "0", 10) || 0,
+    dashDe: searchParams.get("de") || "",
+    dashAte: searchParams.get("ate") || "",
   };
 
   const segs = pathname.split("/").filter(Boolean).map(decodeURIComponent);
@@ -164,6 +180,18 @@ export function parseRoute(
     return route;
   }
 
+  if (segs[0] === "dash") {
+    route.view = "dash";
+    // /dash/<ano> ex.: /dash/2026 → filtra ano calendário
+    if (segs[1]) {
+      const yr = parseInt(segs[1], 10);
+      if (Number.isFinite(yr) && yr >= 2000 && yr <= 2100) {
+        route.dashAno = yr;
+      }
+    }
+    return route;
+  }
+
   return route;
 }
 
@@ -199,6 +227,9 @@ export function buildRoute(route: AppRoute): string {
     if (route.dateView !== "weekly") {
       segs.push(DATEVIEW_TO_PERIODO[route.dateView]);
     }
+  } else if (route.view === "dash") {
+    segs.push("dash");
+    if (route.dashAno) segs.push(String(route.dashAno));
   }
 
   const pathname = segs.length ? `/${segs.join("/")}` : "/";
@@ -207,6 +238,8 @@ export function buildRoute(route: AppRoute): string {
   if (route.busca) sp.set("busca", route.busca);
   if (route.weekOffset && route.weekOffset !== 0)
     sp.set("semana", String(route.weekOffset));
+  if (route.dashDe) sp.set("de", route.dashDe);
+  if (route.dashAte) sp.set("ate", route.dashAte);
 
   const qs = sp.toString();
   return qs ? `${pathname}?${qs}` : pathname;
