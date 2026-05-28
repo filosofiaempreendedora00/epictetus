@@ -63,6 +63,7 @@ export type AppRoute = {
   weekOffset: number;   // ?semana=N
   // Dashboard (só aplicável quando view === "dash"):
   dashAno: number | null;   // /dash/<ano> ou null pra "últimos 12 meses"
+  dashMes: string;          // ?mes=YYYY-MM (mês específico)
   dashDe: string;           // ?de=YYYY-MM-DD (range customizado)
   dashAte: string;          // ?ate=YYYY-MM-DD
 };
@@ -114,6 +115,7 @@ const EMPTY_ROUTE: AppRoute = {
   busca: "",
   weekOffset: 0,
   dashAno: null,
+  dashMes: "",
   dashDe: "",
   dashAte: "",
 };
@@ -126,6 +128,7 @@ export function parseRoute(
     ...EMPTY_ROUTE,
     busca: searchParams.get("busca") || "",
     weekOffset: parseInt(searchParams.get("semana") || "0", 10) || 0,
+    dashMes: searchParams.get("mes") || "",
     dashDe: searchParams.get("de") || "",
     dashAte: searchParams.get("ate") || "",
   };
@@ -238,6 +241,7 @@ export function buildRoute(route: AppRoute): string {
   if (route.busca) sp.set("busca", route.busca);
   if (route.weekOffset && route.weekOffset !== 0)
     sp.set("semana", String(route.weekOffset));
+  if (route.dashMes) sp.set("mes", route.dashMes);
   if (route.dashDe) sp.set("de", route.dashDe);
   if (route.dashAte) sp.set("ate", route.dashAte);
 

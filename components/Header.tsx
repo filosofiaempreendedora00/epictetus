@@ -104,9 +104,11 @@ export default function Header({
         >
           Reuniões
         </button>
+        {/* Dashboard fica na sidebar no desktop; em mobile aparece aqui
+            (último botão) pra ainda ser acessível sem sidebar. */}
         <button
           onClick={() => onViewModeChange("dash")}
-          className={`px-3 sm:px-3 py-2 sm:py-1 text-[13px] rounded-md transition ${
+          className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
             viewMode === "dash"
               ? "bg-white/15 text-white font-medium shadow-sm"
               : "text-white/55 hover:text-white/85"

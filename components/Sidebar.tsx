@@ -1,23 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRoute, type ViewMode } from "@/lib/route";
 
 type Item = {
   key: string;
   label: string;
   icon: string;
   available: boolean;
+  // Se a sidebar deve marcar esse item como ativo, dado o viewMode atual
+  matches?: (view: ViewMode) => boolean;
+  // Pra onde navegar quando clicar
+  navigateTo?: ViewMode;
 };
 
 const items: Item[] = [
-  { key: "kanban", label: "Kanban", icon: "▦", available: true },
-  { key: "scripts", label: "Scripts prontos de mensagens", icon: "💬", available: false },
+  {
+    key: "kanban",
+    label: "Kanban",
+    icon: "▦",
+    available: true,
+    // Kanban cobre os 3 sub-modos do board (negócios/tarefas/reuniões).
+    matches: (v) => v === "negocios" || v === "tarefas" || v === "reunioes",
+    navigateTo: "negocios",
+  },
+  {
+    key: "dash",
+    label: "Dashboard",
+    icon: "📊",
+    available: true,
+    matches: (v) => v === "dash",
+    navigateTo: "dash",
+  },
+  {
+    key: "scripts",
+    label: "Scripts prontos de mensagens",
+    icon: "💬",
+    available: false,
+  },
 ];
 
 const STORAGE_KEY = "epictetus.sidebar.expanded";
 
 export default function Sidebar() {
-  const active = "kanban";
+  const { route, setRoute } = useRoute();
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -63,17 +89,23 @@ export default function Sidebar() {
       )}
 
       {items.map((item) => {
-        const isActive = active === item.key && item.available;
+        const isActive = item.matches ? item.matches(route.view) : false;
+        const clickable = item.available && !!item.navigateTo;
         return (
           <button
             key={item.key}
             disabled={!item.available}
+            onClick={() => {
+              if (clickable && item.navigateTo) {
+                setRoute({ view: item.navigateTo });
+              }
+            }}
             className={`w-full flex items-center gap-2.5 rounded-lg text-sm text-left transition ${
               expanded ? "px-3 py-2.5" : "justify-center px-0 py-2.5"
             } ${
               isActive
                 ? "bg-white/10 text-white font-medium"
-                : item.available
+                : clickable
                 ? "text-white/70 hover:bg-white/[0.06] hover:text-white"
                 : "text-white/30 cursor-not-allowed"
             }`}
