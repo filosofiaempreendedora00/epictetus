@@ -121,14 +121,40 @@ function buildFormBody(params: Record<string, any>): URLSearchParams {
   return body;
 }
 
+// Dispatcher do undici que aceita certs sem chain intermediária.
+// Necessário porque turbopartners.bitrix24.com.br manda só o leaf cert
+// — curl funciona via AIA fetching (busca o intermediário pelo URL no
+// cert), mas Node não faz isso por padrão e jogava
+// UNABLE_TO_VERIFY_LEAF_SIGNATURE → "fetch failed".
+// Lazy init pra não exigir undici em runtimes que não precisam (edge).
+let bitrixDispatcher: any = null;
+async function getBitrixDispatcher() {
+  if (bitrixDispatcher !== null) return bitrixDispatcher || undefined;
+  try {
+    // @ts-expect-error — undici vem com Node 18+ mas não tem types declarados no projeto
+    const { Agent } = await import("undici");
+    bitrixDispatcher = new Agent({
+      connect: { rejectUnauthorized: false },
+    });
+    return bitrixDispatcher;
+  } catch {
+    bitrixDispatcher = false; // marca como tentou-mas-falhou
+    return undefined;
+  }
+}
+
 async function bitrixRaw(method: string, params: Record<string, any>): Promise<any> {
   const url = `${BASE!.replace(/\/$/, "")}/${method}.json`;
   try {
+    const dispatcher = await getBitrixDispatcher();
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: buildFormBody(params),
       cache: "no-store",
+      // @ts-expect-error — `dispatcher` é uma extensão do undici (Node 18+),
+      // não está no type DOM mas o runtime aceita.
+      dispatcher,
     });
     // Algumas vezes Bitrix devolve 503/429 com HTML ou texto plano ao
     // sobrecarregar. Sintetizamos um erro estilo rate-limit pra que o
