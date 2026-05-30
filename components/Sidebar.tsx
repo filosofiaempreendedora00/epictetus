@@ -33,6 +33,14 @@ const items: Item[] = [
     navigateTo: "dash",
   },
   {
+    key: "congelados",
+    label: "Pipeline de Congelados",
+    icon: "❄️",
+    available: true,
+    matches: (v) => v === "congelados",
+    navigateTo: "congelados",
+  },
+  {
     key: "scripts",
     label: "Scripts prontos de mensagens",
     icon: "💬",

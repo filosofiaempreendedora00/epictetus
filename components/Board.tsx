@@ -21,6 +21,7 @@ import Header from "./Header";
 import TasksView from "./TasksView";
 import MeetingsView from "./MeetingsView";
 import DashView from "./DashView";
+import CongeladosView from "./CongeladosView";
 import CongeladoModal from "./CongeladoModal";
 import ReuniaoRealizadaModal from "./ReuniaoRealizadaModal";
 import AguardandoDadosModal from "./AguardandoDadosModal";
@@ -738,6 +739,8 @@ export default function Board() {
         <MeetingsView />
       ) : viewMode === "dash" ? (
         <DashView />
+      ) : viewMode === "congelados" ? (
+        <CongeladosView />
       ) : loading ? (
         <div className="px-3 sm:px-6 py-10 text-white/80 text-sm">
           Carregando negócios do Bitrix…
@@ -912,8 +915,13 @@ export default function Board() {
         />
       )}
 
-      {/* Modal "Editar negócio" controlado pelo path — /negocios/<nome> */}
+      {/* Modal "Editar negócio" controlado pelo path — /negocios/<nome>.
+          Não abre quando estamos em /congelados — esse view tem seu
+          próprio modal de ficha (CongeladoCardModal), porque o state
+          do Board só tem deals ativos do Roberto e não cobre o pool
+          de congelados (que inclui deals de outros vendedores). */}
       {(() => {
+        if (route.view === "congelados") return null;
         if (route.modal !== "editarNegocio") return null;
         const dealOptions = Object.values(state.cards)
           .filter((c) => !!c.bitrixId)

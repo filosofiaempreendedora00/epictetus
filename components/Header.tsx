@@ -1,6 +1,11 @@
 "use client";
 
-export type ViewMode = "negocios" | "tarefas" | "reunioes" | "dash";
+export type ViewMode =
+  | "negocios"
+  | "tarefas"
+  | "reunioes"
+  | "dash"
+  | "congelados";
 
 type Props = {
   searchTerm: string;
@@ -22,10 +27,14 @@ export default function Header({
       ? "Reuniões do Roberto"
       : viewMode === "dash"
       ? "Dashboard do Roberto"
+      : viewMode === "congelados"
+      ? "Pipeline de Congelados"
       : "Negócios do Roberto";
-  // Busca só faz sentido pra negócios/tarefas (filtra a lista). Em reuniões
-  // e dash não temos esse search-bar.
-  const showSearch = viewMode !== "reunioes" && viewMode !== "dash";
+  // Busca só faz sentido pra negócios/tarefas (filtra a lista). Reuniões,
+  // dash e congelados têm controles próprios (ou em congelados a busca
+  // está dentro da própria view).
+  const showSearch =
+    viewMode !== "reunioes" && viewMode !== "dash" && viewMode !== "congelados";
 
   return (
     <header className="px-3 sm:px-6 pt-3 sm:pt-6 pb-3">
@@ -104,8 +113,8 @@ export default function Header({
         >
           Reuniões
         </button>
-        {/* Dashboard fica na sidebar no desktop; em mobile aparece aqui
-            (último botão) pra ainda ser acessível sem sidebar. */}
+        {/* Dashboard e Congelados ficam na sidebar no desktop; em mobile
+            aparecem aqui (md:hidden) pra ainda serem acessíveis sem sidebar. */}
         <button
           onClick={() => onViewModeChange("dash")}
           className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
@@ -115,6 +124,16 @@ export default function Header({
           }`}
         >
           Dashboard
+        </button>
+        <button
+          onClick={() => onViewModeChange("congelados")}
+          className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
+            viewMode === "congelados"
+              ? "bg-white/15 text-white font-medium shadow-sm"
+              : "text-white/55 hover:text-white/85"
+          }`}
+        >
+          ❄️ Congelados
         </button>
       </div>
     </header>

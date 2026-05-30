@@ -46,8 +46,17 @@ import type { TaskType } from "./taskTypes";
 //   ?de=YYYY-MM-DD&ate=YYYY-MM-DD      → range customizado (sobrepõe path)
 //   "Dashboard"                        → /dash
 //   "Dashboard 2025"                   → /dash/2025
+//
+// Congelados (pipeline dos deals em LOSE, agrupados por motivo):
+//   /congelados                        → kanban por motivo de perda
+//   "Congelados"                       → /congelados
 
-export type ViewMode = "negocios" | "tarefas" | "reunioes" | "dash";
+export type ViewMode =
+  | "negocios"
+  | "tarefas"
+  | "reunioes"
+  | "dash"
+  | "congelados";
 export type DateView = "weekly" | "biweekly" | "monthly";
 export type TypeFilter = "ALL" | TaskType;
 export type ModalKind = "editarNegocio" | "novaTarefa" | null;
@@ -183,6 +192,16 @@ export function parseRoute(
     return route;
   }
 
+  if (segs[0] === "congelados") {
+    route.view = "congelados";
+    if (segs[1]) {
+      // Reusa o modal de editar negócio nesse pipeline também
+      route.modal = "editarNegocio";
+      route.cliente = segs[1];
+    }
+    return route;
+  }
+
   if (segs[0] === "dash") {
     route.view = "dash";
     // /dash/<ano> ex.: /dash/2026 → filtra ano calendário
@@ -233,6 +252,11 @@ export function buildRoute(route: AppRoute): string {
   } else if (route.view === "dash") {
     segs.push("dash");
     if (route.dashAno) segs.push(String(route.dashAno));
+  } else if (route.view === "congelados") {
+    segs.push("congelados");
+    if (route.modal === "editarNegocio" && route.cliente) {
+      segs.push(slugifyClient(route.cliente));
+    }
   }
 
   const pathname = segs.length ? `/${segs.join("/")}` : "/";

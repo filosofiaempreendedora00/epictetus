@@ -25,6 +25,10 @@ export type Card = {
   tasks?: DealTask[];
   phone?: string;
   proposalLink?: string;
+  // Campos extras do pipeline de Congelados (preenchidos só por
+  // /api/bitrix/congelados; demais views deixam undefined).
+  congeladoMotivos?: string[];
+  congeladoDescricao?: string;
 };
 
 export type Column = {
