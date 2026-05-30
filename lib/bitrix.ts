@@ -1,22 +1,26 @@
 const BASE = process.env.BITRIX_WEBHOOK_URL;
 
-// Bitrix devolve esse código quando passamos do rate limit (geralmente
-// ~2 req/s por webhook). Quando isso aparece, retry com backoff
-// exponencial — costuma resolver em 1–2 tentativas.
-const RATE_LIMIT_CODES = new Set([
-  "QUERY_LIMIT_EXCEEDED",
-  "OPERATION_TIME_LIMIT",
-  "OVERLOAD_LIMIT",
+// Erros transitórios que valem retry: rate-limit do Bitrix + erros de
+// rede genéricos (DNS, connect timeout, TLS handshake, etc.) que aparecem
+// no Render quando a outbound network engasga ou Bitrix demora demais.
+const RETRY_CODES = new Set([
+  "QUERY_LIMIT_EXCEEDED",   // Bitrix: too many requests
+  "OPERATION_TIME_LIMIT",   // Bitrix: limite de tempo de operação
+  "OVERLOAD_LIMIT",         // Bitrix: sobrecarga
+  "NETWORK_ERROR",          // Node fetch jogou ECONNRESET/fetch failed/etc.
+  "HTTP_502",               // Bitrix gateway momentâneo
+  "HTTP_503",               // Bitrix gateway momentâneo
+  "HTTP_504",               // Gateway timeout
 ]);
-const RATE_LIMIT_RE = /too many requests|query limit|overload/i;
+const RETRY_RE = /too many requests|query limit|overload|fetch failed|timeout|econn|socket|network|getaddr/i;
 
-function isRateLimitError(err: {
+function isRetryableError(err: {
   error?: string;
   error_description?: string;
 }): boolean {
-  if (err.error && RATE_LIMIT_CODES.has(String(err.error).toUpperCase())) return true;
-  if (err.error_description && RATE_LIMIT_RE.test(err.error_description)) return true;
-  if (err.error && RATE_LIMIT_RE.test(String(err.error))) return true;
+  if (err.error && RETRY_CODES.has(String(err.error).toUpperCase())) return true;
+  if (err.error_description && RETRY_RE.test(err.error_description)) return true;
+  if (err.error && RETRY_RE.test(String(err.error))) return true;
   return false;
 }
 
@@ -131,8 +135,18 @@ async function bitrixRaw(method: string, params: Record<string, any>): Promise<a
     // retry pegue.
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      if (res.status === 429 || res.status === 503 || /too many|overload/i.test(text)) {
-        return { error: "QUERY_LIMIT_EXCEEDED", error_description: text || `HTTP ${res.status}` };
+      // 429/502/503/504 são gateways/rate-limit/timeout transientes — retry
+      if (
+        res.status === 429 ||
+        res.status === 502 ||
+        res.status === 503 ||
+        res.status === 504 ||
+        /too many|overload|gateway|timeout/i.test(text)
+      ) {
+        return {
+          error: `HTTP_${res.status}`,
+          error_description: text || `HTTP ${res.status}`,
+        };
       }
       // Tenta parsear JSON do corpo de erro mesmo assim
       try {
@@ -185,7 +199,7 @@ export async function bitrix<T = any>(
       return json.result as T;
     }
     lastErr = json;
-    if (!isRateLimitError(json) || attempt === delays.length) break;
+    if (!isRetryableError(json) || attempt === delays.length) break;
     await sleep(delays[attempt]);
   }
 
@@ -213,7 +227,7 @@ export async function bitrixListAll<T = any>(
         releaseSlot();
       }
       if (!json.error) break;
-      if (!isRateLimitError(json) || attempt === delays.length) {
+      if (!isRetryableError(json) || attempt === delays.length) {
         throw new Error(`Bitrix ${method}: ${json.error_description || json.error}`);
       }
       await sleep(delays[attempt]);
