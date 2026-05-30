@@ -23,12 +23,15 @@ const FIELD_PROPOSAL_LINK = "UF_CRM_1758580725895";
 // está há ≤ maxDays. O último bucket usa Infinity pra capturar o resto.
 // Cores em gradiente de "quente" (recente, ainda dá pra recuperar) pra
 // "frio" (antigo, provavelmente perdido).
+// Títulos descrevem o range REAL (faixa de dias), não só o teto. Antes
+// estava "Há 60 dias" — confundia, parecia que todo deal da coluna tinha
+// exatamente 60 dias quando na verdade era 31 a 60.
 const TIME_BUCKETS = [
-  { id: "le-7", title: "Há 7 dias", maxDays: 7, color: "from-rose-500 to-orange-500" },
-  { id: "le-15", title: "Há 15 dias", maxDays: 15, color: "from-orange-500 to-amber-500" },
-  { id: "le-30", title: "Há 30 dias", maxDays: 30, color: "from-amber-500 to-yellow-500" },
-  { id: "le-60", title: "Há 60 dias", maxDays: 60, color: "from-sky-500 to-cyan-500" },
-  { id: "older", title: "Mais de 60 dias", maxDays: Infinity, color: "from-slate-500 to-slate-600" },
+  { id: "le-7", title: "Há até 7 dias", maxDays: 7, color: "from-rose-500 to-orange-500" },
+  { id: "le-15", title: "Há 8 a 15 dias", maxDays: 15, color: "from-orange-500 to-amber-500" },
+  { id: "le-30", title: "Há 16 a 30 dias", maxDays: 30, color: "from-amber-500 to-yellow-500" },
+  { id: "le-60", title: "Há 31 a 60 dias", maxDays: 60, color: "from-sky-500 to-cyan-500" },
+  { id: "older", title: "Há mais de 60 dias", maxDays: Infinity, color: "from-slate-500 to-slate-600" },
 ] as const;
 
 function bucketIdFor(daysAgo: number): string {

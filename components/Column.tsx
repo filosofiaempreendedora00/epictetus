@@ -51,9 +51,17 @@ export default function Column({
       <div
         className={`bg-gradient-to-r ${column.color} rounded-t-2xl px-4 py-3 flex items-center justify-between shadow-md`}
       >
-        <div className="flex items-center gap-1.5 text-white font-medium text-[13px] min-w-0">
+        <div className="flex items-center gap-2 text-white font-medium text-[13px] min-w-0">
           <span className="whitespace-nowrap truncate">{column.title}</span>
-          <span className="text-white/80 shrink-0">{cards.length}</span>
+          {/* Badge da contagem — pill com fundo translúcido pra ficar
+              claro que é um contador (antes vinha "Há 60 dias 5" e parecia
+              um único texto confuso). */}
+          <span
+            className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-white/20 text-white text-[11px] font-semibold leading-none"
+            title={`${cards.length} card${cards.length === 1 ? "" : "s"}`}
+          >
+            {cards.length}
+          </span>
         </div>
         <button
           className="text-white/80 hover:text-white w-6 h-6 rounded-full hover:bg-white/15 transition flex items-center justify-center"
