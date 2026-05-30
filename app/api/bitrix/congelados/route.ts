@@ -89,9 +89,18 @@ const NO_MOTIVO_KEY = "_sem_motivo";
 
 export async function GET() {
   try {
+    const responsibleId = process.env.BITRIX_RESPONSIBLE_USER_ID;
+    if (!responsibleId) {
+      return NextResponse.json(
+        { error: "BITRIX_RESPONSIBLE_USER_ID não configurado" },
+        { status: 500 }
+      );
+    }
+
     const [dealsRaw, sourcesRaw, usersRaw, motivoOptions] = await Promise.all([
       bitrixListAll<RawDeal>("crm.deal.list", {
-        filter: { STAGE_ID: "LOSE" },
+        // Só congelados do Roberto (mesmo critério das outras views).
+        filter: { STAGE_ID: "LOSE", ASSIGNED_BY_ID: responsibleId },
         select: [
           "ID", "TITLE", "OPPORTUNITY", "ASSIGNED_BY_ID", "DATE_MODIFY",
           "SOURCE_ID", "CONTACT_ID",
