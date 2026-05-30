@@ -80,6 +80,16 @@ function relativeDateLabel(iso: string | undefined): string {
   return `há ~${Math.round(days / 365)} anos`;
 }
 
+// Data exata pro chip "gelinho" — formato BR curto (dd/mm/aaaa).
+function dateBRShort(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return undefined;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 async function fetchEnumOptions(fieldName: string): Promise<EnumOption[]> {
   const fields = await bitrix<any[]>("crm.deal.userfield.list", {
     filter: { FIELD_NAME: fieldName },
@@ -198,6 +208,7 @@ export async function GET() {
           typeof d[FIELD_DESCRICAO_PERDA] === "string"
             ? String(d[FIELD_DESCRICAO_PERDA]).trim() || undefined
             : undefined,
+        congeladoEm: dateBRShort(closeIso),
       } as Card;
       cards[id] = card;
       const col = colByBucketId.get(bucketId);

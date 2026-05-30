@@ -314,6 +314,18 @@ export default function Card({
           {card.title}
         </h3>
 
+        {/* Chip "gelinho" — só aparece em cards do pipeline de Congelados.
+            Mostra a data exata do congelamento (CLOSEDATE) com vibe
+            azul-gelo + ❄️ pra reforçar visualmente. */}
+        {card.congeladoEm && (
+          <div className="mt-1.5">
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-gradient-to-r from-sky-50 to-cyan-50 border border-sky-200/80 text-sky-700 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]">
+              <span className="text-sky-500" aria-hidden>❄</span>
+              <span>Congelado em {card.congeladoEm}</span>
+            </span>
+          </div>
+        )}
+
         {/* Valores R e P (sempre visíveis, editáveis) */}
         <div className="mt-1.5 space-y-0.5">
           <MoneyRow

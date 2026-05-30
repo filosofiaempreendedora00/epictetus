@@ -29,6 +29,9 @@ export type Card = {
   // /api/bitrix/congelados; demais views deixam undefined).
   congeladoMotivos?: string[];
   congeladoDescricao?: string;
+  // Data exata do congelamento (CLOSEDATE), já formatada pro display
+  // — ex.: "26/05/2026". O Card pinta isso num chip "gelinho" se vier.
+  congeladoEm?: string;
 };
 
 export type Column = {

@@ -320,9 +320,19 @@ function CongeladoCardModal({
             </div>
             <div>
               <div className="text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
-                Última atualização
+                Congelado em
               </div>
-              <div className="text-sm text-slate-900">{card.dateLabel}</div>
+              <div className="text-sm text-slate-900 inline-flex items-center gap-1.5">
+                <span className="text-sky-500" aria-hidden>❄</span>
+                <span>
+                  {card.congeladoEm || card.dateLabel || "—"}
+                </span>
+                {card.congeladoEm && card.dateLabel && (
+                  <span className="text-slate-400 text-[11px]">
+                    ({card.dateLabel})
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
