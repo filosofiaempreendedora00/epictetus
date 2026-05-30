@@ -131,7 +131,6 @@ let bitrixDispatcher: any = null;
 async function getBitrixDispatcher() {
   if (bitrixDispatcher !== null) return bitrixDispatcher || undefined;
   try {
-    // @ts-expect-error — undici vem com Node 18+ mas não tem types declarados no projeto
     const { Agent } = await import("undici");
     bitrixDispatcher = new Agent({
       connect: { rejectUnauthorized: false },

@@ -4,9 +4,11 @@ import type { BoardState, Card, Column, EnumOption } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// Pipeline de Congelados: pega tudo o que está em STAGE_ID=LOSE no Bitrix
-// e organiza em colunas por MOTIVO DE PERDA (primeiro motivo do array).
-// V1 é só leitura — devolvemos no mesmo formato BoardState do /api/bitrix/board
+// Pipeline de Congelados: pega tudo o que está em STAGE_ID=LOSE do Roberto
+// e organiza em colunas por TEMPO DESDE QUE FOI CONGELADO (CLOSEDATE).
+// Buckets: ≤7 dias, ≤15 dias, ≤30 dias, ≤60 dias, mais de 60 dias.
+// Os motivos do deal ficam disponíveis nos cards (pra ver no modal).
+// V1 read-only — devolvemos no mesmo formato BoardState do /api/bitrix/board
 // pra que a UI possa reusar Card + Column.
 
 const FIELD_VALOR_PONTUAL = "UF_CRM_1752256743002";
@@ -16,23 +18,25 @@ const FIELD_DESCRICAO_PERDA = "UF_CRM_1753447633";
 const FIELD_SERVICOS_MAPEADOS = "UF_CRM_1772734873";
 const FIELD_PROPOSAL_LINK = "UF_CRM_1758580725895";
 
-// Cores pra cada coluna (uma paleta variada pra diferenciar visualmente
-// os motivos — ciclamos pelo array conforme a ordem que vier do Bitrix).
-const COLUMN_COLORS = [
-  "from-rose-500 to-red-500",
-  "from-orange-500 to-amber-500",
-  "from-amber-500 to-yellow-500",
-  "from-lime-500 to-green-500",
-  "from-emerald-500 to-teal-500",
-  "from-cyan-500 to-sky-500",
-  "from-sky-500 to-blue-500",
-  "from-indigo-500 to-violet-500",
-  "from-violet-500 to-purple-500",
-  "from-purple-500 to-fuchsia-500",
-  "from-pink-500 to-rose-500",
-  "from-slate-500 to-slate-600",
-  "from-zinc-500 to-zinc-600",
-];
+// Buckets de tempo (ordem da esquerda pra direita = mais recente → mais antigo).
+// `maxDays` é INCLUSIVO: vão pra essa coluna todos os deals cujo CLOSEDATE
+// está há ≤ maxDays. O último bucket usa Infinity pra capturar o resto.
+// Cores em gradiente de "quente" (recente, ainda dá pra recuperar) pra
+// "frio" (antigo, provavelmente perdido).
+const TIME_BUCKETS = [
+  { id: "le-7", title: "Há 7 dias", maxDays: 7, color: "from-rose-500 to-orange-500" },
+  { id: "le-15", title: "Há 15 dias", maxDays: 15, color: "from-orange-500 to-amber-500" },
+  { id: "le-30", title: "Há 30 dias", maxDays: 30, color: "from-amber-500 to-yellow-500" },
+  { id: "le-60", title: "Há 60 dias", maxDays: 60, color: "from-sky-500 to-cyan-500" },
+  { id: "older", title: "Mais de 60 dias", maxDays: Infinity, color: "from-slate-500 to-slate-600" },
+] as const;
+
+function bucketIdFor(daysAgo: number): string {
+  for (const b of TIME_BUCKETS) {
+    if (daysAgo <= b.maxDays) return b.id;
+  }
+  return "older";
+}
 
 type RawDeal = {
   ID: string;
@@ -56,24 +60,24 @@ function parseMoneyField(raw: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
-const PT_MONTH = [
-  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
-];
+// Para congelados a data mais útil é "há quantos dias foi congelado"
+// (não o dia exato). Formata como "hoje", "ontem", "há 3 dias", etc.
+function daysAgoFromDate(d: Date, now: Date = new Date()): number {
+  const ms = now.getTime() - d.getTime();
+  return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
 
-function dateLabel(iso: string | undefined): string {
-  if (!iso) return "";
+function relativeDateLabel(iso: string | undefined): string {
+  if (!iso) return "data desconhecida";
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return `hoje, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  }
-  return `${d.getDate()} de ${PT_MONTH[d.getMonth()]}`;
+  if (isNaN(d.getTime())) return "data desconhecida";
+  const days = daysAgoFromDate(d);
+  if (days <= 0) return "hoje";
+  if (days === 1) return "ontem";
+  if (days < 30) return `há ${days} dias`;
+  if (days < 60) return `há ~${Math.round(days / 7)} semanas`;
+  if (days < 365) return `há ~${Math.round(days / 30)} meses`;
+  return `há ~${Math.round(days / 365)} anos`;
 }
 
 async function fetchEnumOptions(fieldName: string): Promise<EnumOption[]> {
@@ -84,8 +88,6 @@ async function fetchEnumOptions(fieldName: string): Promise<EnumOption[]> {
   const list = field?.LIST || [];
   return list.map((item: any) => ({ id: String(item.ID), value: String(item.VALUE) }));
 }
-
-const NO_MOTIVO_KEY = "_sem_motivo";
 
 export async function GET() {
   try {
@@ -102,13 +104,15 @@ export async function GET() {
         // Só congelados do Roberto (mesmo critério das outras views).
         filter: { STAGE_ID: "LOSE", ASSIGNED_BY_ID: responsibleId },
         select: [
-          "ID", "TITLE", "OPPORTUNITY", "ASSIGNED_BY_ID", "DATE_MODIFY",
+          "ID", "TITLE", "OPPORTUNITY", "ASSIGNED_BY_ID",
+          "DATE_MODIFY", "CLOSEDATE",
           "SOURCE_ID", "CONTACT_ID",
           FIELD_VALOR_PONTUAL, FIELD_VALOR_RECORRENTE,
           FIELD_MOTIVO_PERDA, FIELD_DESCRICAO_PERDA, FIELD_SERVICOS_MAPEADOS,
           FIELD_PROPOSAL_LINK,
         ],
-        order: { DATE_MODIFY: "DESC" },
+        // Mais recentes primeiro (data do congelamento ⇒ CLOSEDATE).
+        order: { CLOSEDATE: "DESC" },
       }),
       bitrix<{ STATUS_ID: string; NAME: string }[]>("crm.status.list", {
         filter: { ENTITY_ID: "SOURCE" },
@@ -129,53 +133,54 @@ export async function GET() {
     const motivoLabelById = new Map<string, string>();
     motivoOptions.forEach((m) => motivoLabelById.set(m.id, m.value));
 
-    // Cria colunas — ordem: a do Bitrix + uma "Sem motivo" no final.
-    const columns: Column[] = motivoOptions.map((m, i) => ({
-      id: `col-motivo-${m.id}`,
-      title: m.value,
-      color: COLUMN_COLORS[i % COLUMN_COLORS.length],
+    // Cria as 5 colunas de bucket de tempo (ordem fixa, do mais recente
+    // pro mais antigo). Sempre todas presentes mesmo que vazias —
+    // mantém a estrutura visual estável.
+    const columns: Column[] = TIME_BUCKETS.map((b) => ({
+      id: `col-bucket-${b.id}`,
+      title: b.title,
+      color: b.color,
       cardIds: [],
-      // stageId aqui não corresponde ao Bitrix STAGE — é o ID do motivo.
-      // Sinalizamos como undefined pra desativar drag-and-drop (a UI
-      // existente exige stageId pra mover).
+      // stageId undefined → UI não habilita drag-and-drop nem dropdown
+      // de fase (essas colunas não são fases reais do Bitrix).
       stageId: undefined,
     }));
-    columns.push({
-      id: `col-motivo-${NO_MOTIVO_KEY}`,
-      title: "Sem motivo",
-      color: "from-slate-600 to-slate-700",
-      cardIds: [],
-      stageId: undefined,
-    });
+    const colByBucketId = new Map<string, Column>(
+      columns.map((c) => [c.id.replace("col-bucket-", ""), c])
+    );
 
-    const colByMotivoId = new Map<string, Column>();
-    columns.forEach((c) => {
-      // Recupera o motivo id a partir do col.id
-      const mid = c.id.replace("col-motivo-", "");
-      colByMotivoId.set(mid, c);
-    });
+    const now = new Date();
 
     const cards: Record<string, Card> = {};
     for (const d of dealsRaw) {
       const id = `card-${d.ID}`;
-      // Motivo array vem como ["1738","1712"] ou similar
+      // Motivo (pra mostrar no card / modal). Array enum-multi.
       const motivoRaw = d[FIELD_MOTIVO_PERDA];
       const motivoIds = Array.isArray(motivoRaw)
         ? motivoRaw.map(String)
         : motivoRaw
         ? [String(motivoRaw)]
         : [];
-      const primaryMotivo = motivoIds[0] || NO_MOTIVO_KEY;
       const motivoLabels = motivoIds
         .map((mid) => motivoLabelById.get(mid))
         .filter(Boolean) as string[];
+
+      // CLOSEDATE = quando virou LOSE; fallback DATE_MODIFY se ausente.
+      const closeIso = d.CLOSEDATE || d.DATE_MODIFY;
+      const closeDate = closeIso ? new Date(closeIso) : null;
+      const validDate = closeDate && !isNaN(closeDate.getTime());
+      const daysAgo = validDate ? daysAgoFromDate(closeDate!, now) : Infinity;
+      const bucketId = bucketIdFor(daysAgo);
 
       const card: Card = {
         id,
         bitrixId: d.ID,
         title: d.TITLE || "(sem título)",
         value: parseFloat(d.OPPORTUNITY || "0") || 0,
-        dateLabel: dateLabel(d.DATE_MODIFY),
+        // No pipeline de congelados o dateLabel reflete o tempo desde
+        // o congelamento (não a data exata) — informação mais útil pra
+        // priorizar follow-up.
+        dateLabel: relativeDateLabel(closeIso),
         responsible:
           userMap.get(d.ASSIGNED_BY_ID || "") ||
           `Usuário ${d.ASSIGNED_BY_ID}`,
@@ -187,7 +192,7 @@ export async function GET() {
           typeof d[FIELD_PROPOSAL_LINK] === "string"
             ? String(d[FIELD_PROPOSAL_LINK]).trim() || undefined
             : undefined,
-        // Campos extras só pro pipeline de congelados (a UI consome opcionalmente).
+        // Campos extras só pro pipeline de congelados (UI consome opc.).
         congeladoMotivos: motivoLabels,
         congeladoDescricao:
           typeof d[FIELD_DESCRICAO_PERDA] === "string"
@@ -195,7 +200,7 @@ export async function GET() {
             : undefined,
       } as Card;
       cards[id] = card;
-      const col = colByMotivoId.get(primaryMotivo);
+      const col = colByBucketId.get(bucketId);
       if (col) col.cardIds.push(id);
     }
 
