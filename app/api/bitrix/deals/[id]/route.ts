@@ -13,6 +13,9 @@ const FIELD_PROPOSAL_LINK = "UF_CRM_1758580725895";
 // Aguardando Dados (UC_YN6AV9): briefing do projeto + link do contrato
 const FIELD_BRIEFING_PROJETO = "UF_CRM_1753447532";
 const FIELD_LINK_CONTRATO = "UF_CRM_1760536219";
+// Negócio perdido (APOLOGY): motivo (enum single) + descrição
+const FIELD_MOTIVO_PERDA_PERDIDO = "UF_CRM_1753388460";
+const FIELD_DESCRICAO_PERDA_PERDIDO = "UF_CRM_1753447707";
 
 export async function PATCH(
   req: Request,
@@ -49,6 +52,14 @@ export async function PATCH(
     }
     if (typeof body.linkContrato === "string") {
       fields[FIELD_LINK_CONTRATO] = body.linkContrato.trim();
+    }
+    // Campos pra mover pra "Negócio perdido" (APOLOGY) — motivo é
+    // enum SINGLE, descrição é string.
+    if (typeof body.motivoPerdidoId === "string" && body.motivoPerdidoId) {
+      fields[FIELD_MOTIVO_PERDA_PERDIDO] = body.motivoPerdidoId;
+    }
+    if (typeof body.descricaoPerdido === "string") {
+      fields[FIELD_DESCRICAO_PERDA_PERDIDO] = body.descricaoPerdido;
     }
 
     // Campos da Reunião realizada (15 campos obrigatórios pra avançar de etapa)

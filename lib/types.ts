@@ -54,6 +54,9 @@ export type BoardState = {
   cards: Record<string, Card>;
   loseFieldOptions?: LoseFieldOptions;
   reuniaoFieldOptions?: Record<string, EnumOption[]>;
+  // Opções pro PerdidoModal (stage APOLOGY = "Negócio perdido"):
+  // só "motivo" — não tem serviços nem nada extra.
+  perdidoFieldOptions?: { motivo: EnumOption[] };
 };
 
 import type { TaskType } from "./taskTypes";

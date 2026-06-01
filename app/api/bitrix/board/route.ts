@@ -82,6 +82,8 @@ const FIELD_VALOR_PONTUAL = "UF_CRM_1752256743002";
 const FIELD_VALOR_RECORRENTE = "UF_CRM_1752256871802";
 const FIELD_MOTIVO_PERDA = "UF_CRM_1771965137";
 const FIELD_SERVICOS_MAPEADOS = "UF_CRM_1772734873";
+// Negócio perdido (APOLOGY) — campos diferentes do Congelado.
+const FIELD_MOTIVO_PERDA_PERDIDO = "UF_CRM_1753388460";
 // Campo URL genérico que vamos usar pra "Link da proposta".
 // Se preferir criar um dedicado no Bitrix, basta trocar esse ID.
 const FIELD_PROPOSAL_LINK = "UF_CRM_1758580725895";
@@ -235,6 +237,7 @@ export async function GET() {
       tasksResp,
       motivoOpts,
       servicosOpts,
+      motivoPerdidoOpts,
     ] = await Promise.all([
       bitrix<StatusRow[]>("crm.status.list", {
         filter: { ENTITY_ID: "DEAL_STAGE" },
@@ -258,6 +261,7 @@ export async function GET() {
       fetchOpenTasks(),
       fetchEnumOptions(FIELD_MOTIVO_PERDA),
       fetchEnumOptions(FIELD_SERVICOS_MAPEADOS),
+      fetchEnumOptions(FIELD_MOTIVO_PERDA_PERDIDO),
     ]);
 
     const tasksByDealId = groupTasksByDeal(tasksResp);
@@ -343,6 +347,7 @@ export async function GET() {
       columns,
       cards,
       loseFieldOptions: { motivo: motivoOpts, servicos: servicosOpts },
+      perdidoFieldOptions: { motivo: motivoPerdidoOpts },
       reuniaoFieldOptions,
     };
     return NextResponse.json(state);

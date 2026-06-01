@@ -25,6 +25,7 @@ import CongeladosView from "./CongeladosView";
 import CongeladoModal from "./CongeladoModal";
 import ReuniaoRealizadaModal from "./ReuniaoRealizadaModal";
 import AguardandoDadosModal from "./AguardandoDadosModal";
+import PerdidoModal from "./PerdidoModal";
 import DealEditModal from "./DealEditModal";
 import {
   closeModal,
@@ -39,6 +40,8 @@ const LOSE_STAGE_ID = "LOSE";
 const NEW_STAGE_ID = "NEW";
 // Stage que exige briefing + link do contrato pra entrar
 const AGUARDANDO_DADOS_STAGE_ID = "UC_YN6AV9";
+// "Negócio perdido" — exige motivo (enum single) + descrição
+const PERDIDO_STAGE_ID = "APOLOGY";
 
 const EMPTY_STATE: BoardState = { columns: [], cards: {} };
 
@@ -72,6 +75,12 @@ export default function Board() {
   const [pendingAguardandoDados, setPendingAguardandoDados] =
     useSessionState<{ cardId: string; originColId: string } | null>(
       "epictetus.pendingAguardandoDados",
+      null
+    );
+  // Mover pra "Negócio perdido" exige preencher motivo + descrição
+  const [pendingPerdido, setPendingPerdido] =
+    useSessionState<{ cardId: string; originColId: string } | null>(
+      "epictetus.pendingPerdido",
       null
     );
 
@@ -165,7 +174,8 @@ export default function Board() {
         fromColStageId === NEW_STAGE_ID && targetCol?.stageId !== NEW_STAGE_ID;
       const isAguardandoDados =
         targetCol?.stageId === AGUARDANDO_DADOS_STAGE_ID;
-      if (!isLose && !isExitingReuniao && !isAguardandoDados && card?.bitrixId && targetCol?.stageId) {
+      const isPerdido = targetCol?.stageId === PERDIDO_STAGE_ID;
+      if (!isLose && !isExitingReuniao && !isAguardandoDados && !isPerdido && card?.bitrixId && targetCol?.stageId) {
         fetch(`/api/bitrix/deals/${card.bitrixId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -227,6 +237,17 @@ export default function Board() {
       origin !== finalColId
     ) {
       setPendingAguardandoDados({ cardId: activeId, originColId: origin });
+      return;
+    }
+
+    // Se foi pra "Negócio perdido" (APOLOGY), abre o modal de motivo +
+    // descrição (campos obrigatórios do Bitrix pra essa etapa).
+    if (
+      finalCol?.stageId === PERDIDO_STAGE_ID &&
+      origin &&
+      origin !== finalColId
+    ) {
+      setPendingPerdido({ cardId: activeId, originColId: origin });
       return;
     }
 
@@ -292,6 +313,12 @@ export default function Board() {
     // Entrar em "Aguardado os dados" exige briefing + link do contrato
     if (newStageId === AGUARDANDO_DADOS_STAGE_ID) {
       setPendingAguardandoDados({ cardId, originColId: fromCol.id });
+      return;
+    }
+
+    // Entrar em "Negócio perdido" exige motivo + descrição
+    if (newStageId === PERDIDO_STAGE_ID) {
+      setPendingPerdido({ cardId, originColId: fromCol.id });
       return;
     }
 
@@ -464,6 +491,55 @@ export default function Board() {
       setState((s) => moveCardBetweenColumns(s, cardId, currentColId, originColId));
     }
     setPendingAguardandoDados(null);
+  }
+
+  async function handleConfirmPerdido(fields: {
+    motivoId: string;
+    descricao: string;
+  }) {
+    if (!pendingPerdido) return;
+    const { cardId, originColId } = pendingPerdido;
+    const card = state.cards[cardId];
+    if (!card?.bitrixId) return;
+
+    const targetCol = state.columns.find((c) => c.stageId === PERDIDO_STAGE_ID);
+    const currentColId = findColumnIdByCard(cardId);
+    if (targetCol && currentColId && currentColId !== targetCol.id) {
+      setState((s) => moveCardBetweenColumns(s, cardId, currentColId, targetCol.id));
+    }
+
+    try {
+      const res = await fetch(`/api/bitrix/deals/${card.bitrixId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stageId: PERDIDO_STAGE_ID,
+          motivoPerdidoId: fields.motivoId,
+          descricaoPerdido: fields.descricao,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Falha ao salvar no Bitrix");
+      }
+      setPendingPerdido(null);
+    } catch (e: any) {
+      const nowColId = findColumnIdByCard(cardId);
+      if (nowColId && nowColId !== originColId) {
+        setState((s) => moveCardBetweenColumns(s, cardId, nowColId, originColId));
+      }
+      throw e;
+    }
+  }
+
+  function handleCancelPerdido() {
+    if (!pendingPerdido) return;
+    const { cardId, originColId } = pendingPerdido;
+    const currentColId = findColumnIdByCard(cardId);
+    if (currentColId && currentColId !== originColId) {
+      setState((s) => moveCardBetweenColumns(s, cardId, currentColId, originColId));
+    }
+    setPendingPerdido(null);
   }
 
   async function handleConfirmReuniaoExit(reuniaoData: Record<string, any>) {
@@ -914,6 +990,52 @@ export default function Board() {
           onConfirm={handleConfirmAguardandoDados}
         />
       )}
+
+      {pendingPerdido &&
+        (() => {
+          if (loading) return null;
+          const opts = state.perdidoFieldOptions;
+          if (!opts || opts.motivo.length === 0) {
+            return (
+              <div
+                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                onClick={handleCancelPerdido}
+              >
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
+                  <h2 className="text-base font-semibold text-slate-900 mb-2">
+                    Opções de "Perdido" indisponíveis
+                  </h2>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Não consegui carregar a lista de motivos do Bitrix.
+                    Recarregue a página e tente de novo.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={handleCancelPerdido}
+                      className="px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-md transition"
+                    >
+                      Fechar
+                    </button>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-4 py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition font-medium"
+                    >
+                      Recarregar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <PerdidoModal
+              cardTitle={state.cards[pendingPerdido.cardId]?.title || ""}
+              motivoOptions={opts.motivo}
+              onCancel={handleCancelPerdido}
+              onConfirm={handleConfirmPerdido}
+            />
+          );
+        })()}
 
       {/* Modal "Editar negócio" controlado pelo path — /negocios/<nome>.
           Não abre quando estamos em /congelados — esse view tem seu
