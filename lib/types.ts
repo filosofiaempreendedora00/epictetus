@@ -32,6 +32,11 @@ export type Card = {
   // Data exata do congelamento (CLOSEDATE), já formatada pro display
   // — ex.: "26/05/2026". O Card pinta isso num chip "gelinho" se vier.
   congeladoEm?: string;
+  // Campos obrigatórios pras etapas "Aguardado os dados" (UC_YN6AV9) e
+  // "Aguardando assinatura" (UC_IF2KBR). Quando o card já tem esses
+  // valores preenchidos, o Board pula o modal e move direto.
+  briefingProjeto?: string;
+  linkContrato?: string;
 };
 
 export type Column = {

@@ -38,8 +38,14 @@ import { useSessionState } from "@/lib/useSessionState";
 
 const LOSE_STAGE_ID = "LOSE";
 const NEW_STAGE_ID = "NEW";
-// Stage que exige briefing + link do contrato pra entrar
+// Stages que exigem briefing + link do contrato. As 2 etapas usam
+// exatamente os mesmos campos, então tratamos como família.
 const AGUARDANDO_DADOS_STAGE_ID = "UC_YN6AV9";
+const AGUARDANDO_ASSINATURA_STAGE_ID = "UC_IF2KBR";
+const STAGES_EXIGEM_BRIEFING_E_CONTRATO = new Set([
+  AGUARDANDO_DADOS_STAGE_ID,
+  AGUARDANDO_ASSINATURA_STAGE_ID,
+]);
 // "Negócio perdido" — exige motivo (enum single) + descrição
 const PERDIDO_STAGE_ID = "APOLOGY";
 
@@ -72,11 +78,14 @@ export default function Board() {
     targetStageId: string;
     targetStageName: string;
   } | null>("epictetus.pendingReuniaoExit", null);
+  // Agora carrega tb targetStageId pra saber se vai pra "Aguardado os dados"
+  // ou "Aguardando assinatura" (ambos usam o mesmo modal).
   const [pendingAguardandoDados, setPendingAguardandoDados] =
-    useSessionState<{ cardId: string; originColId: string } | null>(
-      "epictetus.pendingAguardandoDados",
-      null
-    );
+    useSessionState<{
+      cardId: string;
+      originColId: string;
+      targetStageId: string;
+    } | null>("epictetus.pendingAguardandoDados", null);
   // Mover pra "Negócio perdido" exige preencher motivo + descrição
   const [pendingPerdido, setPendingPerdido] =
     useSessionState<{ cardId: string; originColId: string } | null>(
@@ -172,10 +181,18 @@ export default function Board() {
       const isLose = targetCol?.stageId === LOSE_STAGE_ID;
       const isExitingReuniao =
         fromColStageId === NEW_STAGE_ID && targetCol?.stageId !== NEW_STAGE_ID;
-      const isAguardandoDados =
-        targetCol?.stageId === AGUARDANDO_DADOS_STAGE_ID;
+      // Aguardando Dados / Assinatura: só bloqueamos o PATCH otimista
+      // se os campos ainda não estiverem preenchidos. Com eles preenchidos
+      // a transição é direta (o handleDragEnd lida com o PATCH no fim).
+      const targetExigeBriefing =
+        !!targetCol?.stageId &&
+        STAGES_EXIGEM_BRIEFING_E_CONTRATO.has(targetCol.stageId);
+      const cardJaTemBriefing = !!(
+        card?.briefingProjeto?.trim() && card?.linkContrato?.trim()
+      );
+      const isAguardandoSemDados = targetExigeBriefing && !cardJaTemBriefing;
       const isPerdido = targetCol?.stageId === PERDIDO_STAGE_ID;
-      if (!isLose && !isExitingReuniao && !isAguardandoDados && !isPerdido && card?.bitrixId && targetCol?.stageId) {
+      if (!isLose && !isExitingReuniao && !isAguardandoSemDados && !isPerdido && card?.bitrixId && targetCol?.stageId) {
         fetch(`/api/bitrix/deals/${card.bitrixId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -228,15 +245,35 @@ export default function Board() {
       return;
     }
 
-    // Se foi parar em "Aguardado os dados" vindo de outra coluna, abre o
-    // modal pra preencher briefing + link do contrato (campos obrigatórios
-    // do Bitrix pra essa etapa).
+    // Se foi parar em "Aguardado os dados" OU "Aguardando assinatura"
+    // vindo de outra coluna:
+    //   - Se briefing + link contrato JÁ estiverem preenchidos no card,
+    //     faz PATCH direto (skip modal).
+    //   - Senão abre o modal pra preencher os campos obrigatórios.
     if (
-      finalCol?.stageId === AGUARDANDO_DADOS_STAGE_ID &&
+      finalCol?.stageId &&
+      STAGES_EXIGEM_BRIEFING_E_CONTRATO.has(finalCol.stageId) &&
       origin &&
       origin !== finalColId
     ) {
-      setPendingAguardandoDados({ cardId: activeId, originColId: origin });
+      const c = state.cards[activeId];
+      const filled = !!(c?.briefingProjeto?.trim() && c?.linkContrato?.trim());
+      if (filled && c?.bitrixId) {
+        // PATCH direto, sem modal
+        fetch(`/api/bitrix/deals/${c.bitrixId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stageId: finalCol.stageId }),
+        }).catch(() => {
+          /* TODO: rollback */
+        });
+        return;
+      }
+      setPendingAguardandoDados({
+        cardId: activeId,
+        originColId: origin,
+        targetStageId: finalCol.stageId,
+      });
       return;
     }
 
@@ -310,10 +347,23 @@ export default function Board() {
       return;
     }
 
-    // Entrar em "Aguardado os dados" exige briefing + link do contrato
-    if (newStageId === AGUARDANDO_DADOS_STAGE_ID) {
-      setPendingAguardandoDados({ cardId, originColId: fromCol.id });
-      return;
+    // Entrar em "Aguardado os dados" ou "Aguardando assinatura" exige
+    // briefing + link do contrato — MAS só pede de novo se ainda não
+    // estiverem preenchidos. Card que já veio com os dados passa direto.
+    if (STAGES_EXIGEM_BRIEFING_E_CONTRATO.has(newStageId)) {
+      const c = state.cards[cardId];
+      const filled = !!(c?.briefingProjeto?.trim() && c?.linkContrato?.trim());
+      if (!filled) {
+        setPendingAguardandoDados({
+          cardId,
+          originColId: fromCol.id,
+          targetStageId: newStageId,
+        });
+        return;
+      }
+      // Tá preenchido — segue o fluxo normal de mudança de stage (move
+      // + PATCH direto). Esse return seria fora do if pra cair no fluxo
+      // padrão lá embaixo. Não precisa fazer nada de especial aqui.
     }
 
     // Entrar em "Negócio perdido" exige motivo + descrição
@@ -442,15 +492,17 @@ export default function Board() {
     linkContrato: string;
   }) {
     if (!pendingAguardandoDados) return;
-    const { cardId, originColId } = pendingAguardandoDados;
+    const { cardId, originColId, targetStageId } = pendingAguardandoDados;
+    // Fallback pra retro-compat: estado antigo no sessionStorage pode não
+    // ter targetStageId. Assume UC_YN6AV9 (comportamento original).
+    const effectiveStageId = targetStageId || AGUARDANDO_DADOS_STAGE_ID;
     const card = state.cards[cardId];
     if (!card?.bitrixId) return;
 
-    // Visualmente move o card pra coluna "Aguardado os dados" se ainda
-    // não tá lá (caso o trigger tenha vindo do dropdown do DealEditModal,
-    // não do drag).
+    // Visualmente move o card pra coluna-alvo se ainda não tá lá
+    // (caso o trigger tenha vindo do dropdown do DealEditModal, não do drag).
     const targetCol = state.columns.find(
-      (c) => c.stageId === AGUARDANDO_DADOS_STAGE_ID
+      (c) => c.stageId === effectiveStageId
     );
     const currentColId = findColumnIdByCard(cardId);
     if (targetCol && currentColId && currentColId !== targetCol.id) {
@@ -462,7 +514,7 @@ export default function Board() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          stageId: AGUARDANDO_DADOS_STAGE_ID,
+          stageId: effectiveStageId,
           briefingProjeto: fields.briefingProjeto,
           linkContrato: fields.linkContrato,
         }),
@@ -471,6 +523,20 @@ export default function Board() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || "Falha ao salvar no Bitrix");
       }
+      // Refletir no state local que esses campos agora estão preenchidos
+      // — assim mover esse mesmo card de "Aguardando Dados" pra
+      // "Aguardando Assinatura" depois pula o modal automaticamente.
+      setState((s) => ({
+        ...s,
+        cards: {
+          ...s.cards,
+          [cardId]: {
+            ...s.cards[cardId],
+            briefingProjeto: fields.briefingProjeto,
+            linkContrato: fields.linkContrato,
+          },
+        },
+      }));
       setPendingAguardandoDados(null);
     } catch (e: any) {
       // Rollback: volta pra coluna de origem
@@ -983,13 +1049,26 @@ export default function Board() {
           );
         })()}
 
-      {pendingAguardandoDados && (
-        <AguardandoDadosModal
-          cardTitle={state.cards[pendingAguardandoDados.cardId]?.title || ""}
-          onCancel={handleCancelAguardandoDados}
-          onConfirm={handleConfirmAguardandoDados}
-        />
-      )}
+      {pendingAguardandoDados &&
+        (() => {
+          const targetStageId =
+            pendingAguardandoDados.targetStageId || AGUARDANDO_DADOS_STAGE_ID;
+          const targetCol = state.columns.find(
+            (c) => c.stageId === targetStageId
+          );
+          const targetName = targetCol?.title || "Aguardando Dados";
+          const c = state.cards[pendingAguardandoDados.cardId];
+          return (
+            <AguardandoDadosModal
+              cardTitle={c?.title || ""}
+              targetStageName={targetName}
+              initialBriefing={c?.briefingProjeto || ""}
+              initialLinkContrato={c?.linkContrato || ""}
+              onCancel={handleCancelAguardandoDados}
+              onConfirm={handleConfirmAguardandoDados}
+            />
+          );
+        })()}
 
       {pendingPerdido &&
         (() => {

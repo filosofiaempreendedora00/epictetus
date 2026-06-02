@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 
 type Props = {
   cardTitle: string;
+  // Nome da etapa-alvo pro título do modal. Default mantém o uso
+  // original ("Aguardando Dados"); ao mover pra Aguardando Assinatura,
+  // o Board passa "Aguardando Assinatura".
+  targetStageName?: string;
+  // Pré-preenche os inputs se o deal já tem esses dados (ainda assim o
+  // usuário pode editar antes de salvar).
+  initialBriefing?: string;
+  initialLinkContrato?: string;
   onCancel: () => void;
   onConfirm: (fields: {
     briefingProjeto: string;
@@ -12,18 +20,22 @@ type Props = {
 };
 
 // Modal disparado quando o usuário move (drag ou via dropdown) um negócio
-// pra etapa "Aguardado os dados" (UC_YN6AV9). Mantém paridade visual e de
-// comportamento com CongeladoModal:
+// pra etapa "Aguardado os dados" (UC_YN6AV9) OU "Aguardando assinatura"
+// (UC_IF2KBR) sem ter os 2 campos preenchidos. Mantém paridade visual e
+// de comportamento com CongeladoModal:
 //   - backdrop com blur, fechável só por X (não clica-fora durante save)
 //   - mobile full-screen, desktop centralizado
 //   - botão Salvar disabled enquanto algum campo obrigatório está vazio
 export default function AguardandoDadosModal({
   cardTitle,
+  targetStageName = "Aguardando Dados",
+  initialBriefing = "",
+  initialLinkContrato = "",
   onCancel,
   onConfirm,
 }: Props) {
-  const [briefing, setBriefing] = useState("");
-  const [link, setLink] = useState("");
+  const [briefing, setBriefing] = useState(initialBriefing);
+  const [link, setLink] = useState(initialLinkContrato);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +84,7 @@ export default function AguardandoDadosModal({
         <div className="safe-top px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-slate-900">
-              Mover para Aguardando Dados
+              Mover para {targetStageName}
             </h2>
             <div className="text-[11px] text-slate-500 mt-0.5 break-words">
               {cardTitle}
@@ -92,7 +104,7 @@ export default function AguardandoDadosModal({
         <div className="px-4 sm:px-5 py-4 space-y-4 overflow-y-auto flex-1">
           <div className="text-[12px] text-slate-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
             Preencha os dois campos abaixo para avançar pra etapa{" "}
-            <strong>Aguardando Dados</strong>. Ambos são obrigatórios.
+            <strong>{targetStageName}</strong>. Ambos são obrigatórios.
           </div>
 
           <div>

@@ -87,6 +87,10 @@ const FIELD_MOTIVO_PERDA_PERDIDO = "UF_CRM_1753388460";
 // Campo URL genérico que vamos usar pra "Link da proposta".
 // Se preferir criar um dedicado no Bitrix, basta trocar esse ID.
 const FIELD_PROPOSAL_LINK = "UF_CRM_1758580725895";
+// Campos das etapas "Aguardado os dados" e "Aguardando assinatura".
+// Quando o card já tem ambos preenchidos, o Board pula o modal.
+const FIELD_BRIEFING_PROJETO = "UF_CRM_1753447532";
+const FIELD_LINK_CONTRATO = "UF_CRM_1760536219";
 
 async function fetchEnumOptions(fieldName: string): Promise<EnumOption[]> {
   const fields = await bitrix<any[]>("crm.deal.userfield.list", {
@@ -251,6 +255,7 @@ export async function GET() {
           "CONTACT_ID",
           FIELD_VALOR_PONTUAL, FIELD_VALOR_RECORRENTE,
           FIELD_PROPOSAL_LINK,
+          FIELD_BRIEFING_PROJETO, FIELD_LINK_CONTRATO,
         ],
         order: { DATE_MODIFY: "DESC" },
       }),
@@ -321,6 +326,14 @@ export async function GET() {
         phone: d.CONTACT_ID ? phoneMap.get(d.CONTACT_ID) : undefined,
         proposalLink: typeof d[FIELD_PROPOSAL_LINK] === "string"
           ? String(d[FIELD_PROPOSAL_LINK]).trim() || undefined
+          : undefined,
+        // Esses dois alimentam o "pula o modal se já preenchido"
+        // do AguardandoDados (UC_YN6AV9) e Aguardando assinatura (UC_IF2KBR).
+        briefingProjeto: typeof d[FIELD_BRIEFING_PROJETO] === "string"
+          ? String(d[FIELD_BRIEFING_PROJETO]).trim() || undefined
+          : undefined,
+        linkContrato: typeof d[FIELD_LINK_CONTRATO] === "string"
+          ? String(d[FIELD_LINK_CONTRATO]).trim() || undefined
           : undefined,
       };
       cards[id] = card;
