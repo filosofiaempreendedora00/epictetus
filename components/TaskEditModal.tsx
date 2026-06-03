@@ -482,7 +482,7 @@ export default function TaskEditModal({
       >
         <div className="safe-top px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
           <h2 className="text-base font-semibold text-slate-900">{heading}</h2>
-          <button
+          <button type="button"
             onClick={onClose}
             disabled={busy}
             className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-10 h-10 sm:w-6 sm:h-6 flex items-center justify-center -mr-2 sm:mr-0"
@@ -636,7 +636,7 @@ export default function TaskEditModal({
 
         <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 sm:gap-3 flex-wrap shrink-0 safe-bottom">
           {onComplete ? (
-            <button
+            <button type="button"
               onClick={handleComplete}
               disabled={busy}
               className="inline-flex items-center gap-1.5 px-3 py-2.5 sm:py-1.5 text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition disabled:opacity-50 font-medium"
@@ -666,14 +666,14 @@ export default function TaskEditModal({
             <span />
           )}
           <div className="flex gap-2 ml-auto">
-            <button
+            <button type="button"
               onClick={onClose}
               disabled={busy}
               className="px-4 py-2.5 sm:py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
             >
               Cancelar
             </button>
-            <button
+            <button type="button"
               onClick={handleSave}
               disabled={busy}
               className="px-4 py-2.5 sm:py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"

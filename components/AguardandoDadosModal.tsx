@@ -90,7 +90,7 @@ export default function AguardandoDadosModal({
               {cardTitle}
             </div>
           </div>
-          <button
+          <button type="button"
             onClick={onCancel}
             disabled={saving}
             className="text-slate-400 hover:text-slate-700 transition text-lg leading-none w-10 h-10 sm:w-6 sm:h-6 flex items-center justify-center shrink-0 -mr-2 sm:mr-0"
@@ -143,14 +143,14 @@ export default function AguardandoDadosModal({
         </div>
 
         <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0 safe-bottom">
-          <button
+          <button type="button"
             onClick={onCancel}
             disabled={saving}
             className="px-4 py-2.5 sm:py-1.5 text-sm text-slate-700 hover:bg-slate-200 rounded-md transition disabled:opacity-50"
           >
             Cancelar
           </button>
-          <button
+          <button type="button"
             onClick={handleConfirm}
             disabled={saving || !canSubmit}
             className="px-4 py-2.5 sm:py-1.5 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"

@@ -71,7 +71,7 @@ export default function DealEditModal({
           <h2 className="text-base sm:text-lg font-semibold text-slate-900">
             Editar negócio
           </h2>
-          <button
+          <button type="button"
             onClick={onClose}
             disabled={saving}
             // Touch area ≥40px em mobile; -mr-1 sm:-mr-2 ajusta pra
@@ -125,7 +125,7 @@ export default function DealEditModal({
         </div>
 
         <div className="px-5 sm:px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0 safe-bottom">
-          <button
+          <button type="button"
             onClick={onClose}
             disabled={saving}
             // Touch target ≥44px em mobile
@@ -133,7 +133,7 @@ export default function DealEditModal({
           >
             Cancelar
           </button>
-          <button
+          <button type="button"
             onClick={handleSave}
             disabled={saving}
             className="px-5 py-2 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md transition disabled:opacity-50 font-medium"
