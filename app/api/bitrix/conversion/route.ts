@@ -27,10 +27,20 @@ const APOLOGY_STAGE = "APOLOGY";
 
 type RawDeal = {
   ID: string;
+  TITLE?: string;
   STAGE_ID?: string;
   DATE_CREATE?: string;
   CLOSEDATE?: string;
 };
+
+function brShort(iso: string | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
 
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -85,7 +95,7 @@ export async function GET(req: Request) {
           ">=DATE_CREATE": fromIso,
           "<=DATE_CREATE": toIso,
         },
-        select: ["ID", "STAGE_ID", "DATE_CREATE"],
+        select: ["ID", "TITLE", "STAGE_ID", "DATE_CREATE"],
       }),
       bitrixListAll<RawDeal>("crm.deal.list", {
         filter: {
@@ -94,7 +104,7 @@ export async function GET(req: Request) {
           ">=CLOSEDATE": fromIso,
           "<=CLOSEDATE": toIso,
         },
-        select: ["ID", "CLOSEDATE"],
+        select: ["ID", "TITLE", "CLOSEDATE"],
       }),
       bitrixListAll<RawDeal>("crm.deal.list", {
         filter: {
@@ -103,7 +113,7 @@ export async function GET(req: Request) {
           ">=CLOSEDATE": fromIso,
           "<=CLOSEDATE": toIso,
         },
-        select: ["ID", "CLOSEDATE"],
+        select: ["ID", "TITLE", "CLOSEDATE"],
       }),
       bitrixListAll<RawDeal>("crm.deal.list", {
         filter: {
@@ -112,7 +122,7 @@ export async function GET(req: Request) {
           ">=CLOSEDATE": fromIso,
           "<=CLOSEDATE": toIso,
         },
-        select: ["ID", "CLOSEDATE"],
+        select: ["ID", "TITLE", "CLOSEDATE"],
       }),
     ]);
 
@@ -187,6 +197,22 @@ export async function GET(req: Request) {
     const taxaConversaoTotal =
       reunioesRealizadas > 0 ? ganhos / reunioesRealizadas : 0;
 
+    // Pra drill-down (clicar num indicador → modal com a lista de deals).
+    function pack(
+      arr: RawDeal[],
+      dateField: "DATE_CREATE" | "CLOSEDATE"
+    ): { id: string; title: string; date: string }[] {
+      return arr
+        .map((d) => ({
+          id: String(d.ID),
+          title: d.TITLE || "(sem título)",
+          date: brShort(d[dateField]),
+          rawDate: d[dateField] || "",
+        }))
+        .sort((a, b) => b.rawDate.localeCompare(a.rawDate))
+        .map(({ id, title, date }) => ({ id, title, date }));
+    }
+
     return NextResponse.json({
       range: { from: from.toISOString(), to: to.toISOString() },
       summary: {
@@ -198,6 +224,12 @@ export async function GET(req: Request) {
         taxaConversaoTotal,  // ganhos / reunioes (mais conservador)
       },
       byMonth: filled,
+      deals: {
+        reunioes: pack(created, "DATE_CREATE"),
+        ganhos: pack(won, "CLOSEDATE"),
+        perdidos: pack(lost, "CLOSEDATE"),
+        congelados: pack(frozen, "CLOSEDATE"),
+      },
     });
   } catch (e: any) {
     return NextResponse.json(

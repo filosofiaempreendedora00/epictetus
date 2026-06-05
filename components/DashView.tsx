@@ -49,6 +49,7 @@ type ConvMonthBucket = {
   perdidos: number;
   congelados: number;
 };
+type ConvDealRef = { id: string; title: string; date: string };
 type ConversionResponse = {
   range: { from: string; to: string };
   summary: {
@@ -60,6 +61,12 @@ type ConversionResponse = {
     taxaConversaoTotal: number;
   };
   byMonth: ConvMonthBucket[];
+  deals: {
+    reunioes: ConvDealRef[];
+    ganhos: ConvDealRef[];
+    perdidos: ConvDealRef[];
+    congelados: ConvDealRef[];
+  };
 };
 
 const PT_MONTH_SHORT = [
@@ -392,26 +399,36 @@ export default function DashView() {
   );
 }
 
+type DrillKey = "reunioes" | "ganhos" | "perdidos" | "congelados";
+const DRILL_LABELS: Record<DrillKey, string> = {
+  reunioes: "Reuniões realizadas",
+  ganhos: "Negócios ganhos",
+  perdidos: "Negócios perdidos",
+  congelados: "Negócios congelados",
+};
+
 function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
   const s = conversion.summary;
+  const [drill, setDrill] = useState<DrillKey | null>(null);
   function pct(v: number): string {
     return `${(v * 100).toFixed(1).replace(".", ",")}%`;
   }
   return (
     <>
-      {/* Linha 1: counters absolutos */}
+      {/* Linha 1: counters absolutos — agora clicáveis pra drill-down */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3">
         <InfoCard
           label="Reuniões realizadas"
           value={String(s.reunioesRealizadas)}
           accent="sky"
+          onClick={() => setDrill("reunioes")}
           tooltipTitle="Reuniões realizadas no período"
           tooltipBody={
             <>
               Total de negócios <strong>criados</strong> no intervalo
               selecionado (DATE_CREATE). Todo deal começa na etapa
               "Reunião realizada", então isso equivale a quantas reuniões
-              voce realizou no período.
+              voce realizou no período. <em>Clique pra ver a lista.</em>
             </>
           }
         />
@@ -419,11 +436,13 @@ function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
           label="Ganhos"
           value={String(s.ganhos)}
           accent="emerald"
+          onClick={() => setDrill("ganhos")}
           tooltipTitle="Negócios ganhos"
           tooltipBody={
             <>
               Deals na etapa <strong>Negócio Ganho</strong> (WON) com
-              data de fechamento (CLOSEDATE) no período.
+              data de fechamento (CLOSEDATE) no período.{" "}
+              <em>Clique pra ver a lista.</em>
             </>
           }
         />
@@ -431,11 +450,13 @@ function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
           label="Perdidos"
           value={String(s.perdidos)}
           accent="rose"
+          onClick={() => setDrill("perdidos")}
           tooltipTitle="Negócios perdidos"
           tooltipBody={
             <>
               Deals na etapa <strong>Negócio Perdido</strong> (APOLOGY)
-              com data de fechamento no período.
+              com data de fechamento no período.{" "}
+              <em>Clique pra ver a lista.</em>
             </>
           }
         />
@@ -443,12 +464,14 @@ function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
           label="Congelados"
           value={String(s.congelados)}
           accent="amber"
+          onClick={() => setDrill("congelados")}
           tooltipTitle="Negócios congelados"
           tooltipBody={
             <>
               Deals na etapa <strong>Congelado</strong> (LOSE) com data
               de fechamento no período. Não entram no cálculo da Taxa
-              de fechamento porque ainda podem voltar.
+              de fechamento porque ainda podem voltar.{" "}
+              <em>Clique pra ver a lista.</em>
             </>
           }
         />
@@ -505,26 +528,128 @@ function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
       </div>
 
       <ConversionChart byMonth={conversion.byMonth} />
+
+      {drill && (
+        <DrillModal
+          title={DRILL_LABELS[drill]}
+          deals={conversion.deals[drill]}
+          onClose={() => setDrill(null)}
+        />
+      )}
     </>
   );
 }
 
-// Card com tooltip on-hover. Usei "group" do Tailwind pra não precisar
-// de lib extra. O tooltip aparece acima do card, alinhado à esquerda,
-// e some quando o mouse sai. Em mobile (sem hover) o usuário pode
-// "tap-and-hold" no card pra disparar :hover na maioria dos browsers.
+function DrillModal({
+  title,
+  deals,
+  onClose,
+}: {
+  title: string;
+  deals: ConvDealRef[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-stretch sm:items-center justify-center p-0 sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="bg-[#0e1422] border border-white/10 shadow-2xl w-full sm:max-w-xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[80vh] rounded-none sm:rounded-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="safe-top px-5 py-4 border-b border-white/10 flex items-center justify-between shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-white truncate">
+              {title}
+            </h2>
+            <div className="text-[11px] text-white/50 mt-0.5">
+              {deals.length} {deals.length === 1 ? "negócio" : "negócios"} no
+              período
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-white/50 hover:text-white transition text-lg w-10 h-10 flex items-center justify-center -mr-2"
+            title="Fechar"
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+
+        {deals.length === 0 ? (
+          <div className="px-5 py-10 text-center text-white/40 text-sm">
+            Nenhum negócio nessa categoria no período.
+          </div>
+        ) : (
+          <div className="overflow-y-auto col-scroll flex-1 divide-y divide-white/5">
+            {deals.map((d) => (
+              <a
+                key={d.id}
+                href={`https://turbopartners.bitrix24.com.br/crm/deal/details/${d.id}/`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2.5 flex items-center gap-3 hover:bg-white/[0.03] transition group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-white text-[13px] truncate group-hover:text-sky-300 transition">
+                    {d.title}
+                  </div>
+                </div>
+                <div className="shrink-0 text-[11px] text-white/40 tabular-nums">
+                  {d.date || "—"}
+                </div>
+                <div className="shrink-0 text-[10px] text-white/30 group-hover:text-sky-400 transition">
+                  ↗
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+
+        <div className="px-5 py-3 bg-white/[0.03] border-t border-white/10 flex justify-end shrink-0 safe-bottom">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 text-sm bg-white/10 hover:bg-white/20 text-white rounded-md transition"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Card com tooltip on-hover. Pode ser clicável (drill-down) — quando
+// onClick é passado, o card vira <button> com cursor-pointer e hover
+// visual.
 function InfoCard({
   label,
   value,
   accent,
   tooltipTitle,
   tooltipBody,
+  onClick,
 }: {
   label: string;
   value: string;
   accent: "sky" | "emerald" | "white" | "amber" | "rose";
   tooltipTitle: string;
   tooltipBody: React.ReactNode;
+  onClick?: () => void;
 }) {
   const accentColors: Record<string, string> = {
     sky: "text-sky-400",
@@ -533,8 +658,18 @@ function InfoCard({
     amber: "text-amber-400",
     rose: "text-rose-400",
   };
+  const interactive = !!onClick;
+  const Wrap: any = interactive ? "button" : "div";
   return (
-    <div className="bg-white/[0.04] border border-white/10 rounded-lg p-3 relative group cursor-help">
+    <Wrap
+      type={interactive ? "button" : undefined}
+      onClick={onClick}
+      className={`text-left bg-white/[0.04] border border-white/10 rounded-lg p-3 relative group ${
+        interactive
+          ? "cursor-pointer hover:bg-white/[0.07] hover:border-white/20 transition"
+          : "cursor-help"
+      }`}
+    >
       <div className="flex items-center gap-1.5">
         <div className="text-[10px] sm:text-[11px] text-white/50 uppercase tracking-wide font-medium">
           {label}
@@ -554,36 +689,51 @@ function InfoCard({
         {value}
       </div>
 
-      {/* Tooltip on hover. Posicionado em cima do card; em telas estreitas
-          fica abaixo via sm:bottom-full → bottom-auto top-full não é fácil
-          de detectar; deixamos sempre acima e ajustamos com max-width. */}
-      <div
-        className="pointer-events-none absolute z-20 left-0 right-0 sm:right-auto sm:left-0 sm:w-72 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition shadow-xl"
-      >
+      <div className="pointer-events-none absolute z-20 left-0 right-0 sm:right-auto sm:left-0 sm:w-72 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition shadow-xl">
         <div className="bg-slate-900 border border-white/20 text-white rounded-lg p-3 text-[12px] leading-relaxed">
           <div className="font-semibold mb-1 text-white">{tooltipTitle}</div>
           <div className="text-white/80">{tooltipBody}</div>
         </div>
       </div>
-    </div>
+    </Wrap>
   );
 }
 
 function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
-  // Normaliza pelo pico entre as 3 séries
+  // Recorte: só meses a partir de 2026-01 (deals anteriores estavam num
+  // pipeline diferente / pré-padronização — Roberto pediu pra cortar).
+  const filtered = useMemo(
+    () => byMonth.filter((b) => b.month >= "2026-01"),
+    [byMonth]
+  );
+  // Normaliza pelo pico entre as 4 séries
   const max = useMemo(() => {
     let m = 0;
-    for (const b of byMonth) {
-      m = Math.max(m, b.reunioesRealizadas, b.ganhos, b.perdidos);
+    for (const b of filtered) {
+      m = Math.max(
+        m,
+        b.reunioesRealizadas,
+        b.ganhos,
+        b.perdidos,
+        b.congelados
+      );
     }
     return m || 1;
-  }, [byMonth]);
+  }, [filtered]);
+
+  if (filtered.length === 0) {
+    return (
+      <div className="bg-white/[0.02] border border-white/10 rounded-lg p-4 text-center text-white/40 text-sm">
+        Sem dados de 2026 em diante para esse período.
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white/[0.02] border border-white/10 rounded-lg p-3 sm:p-4">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 className="text-white/80 text-sm font-medium">
-          Reuniões vs Ganhos vs Perdidos (mês a mês)
+          Reuniões vs Ganhos vs Perdidos vs Congelados (mês a mês, 2026+)
         </h3>
         <div className="flex items-center gap-3 text-[11px] text-white/60 flex-wrap">
           <span className="inline-flex items-center gap-1.5">
@@ -595,21 +745,29 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
           <span className="inline-flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-rose-500" /> Perdidos
           </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-amber-500" /> Congelados
+          </span>
         </div>
       </div>
 
-      <div className="flex items-end gap-2 h-56 overflow-x-auto col-scroll pb-2 pt-6">
-        {byMonth.map((b) => {
+      {/* gap-5/6 dá ar entre os meses; cada bucket de mês é um <div com
+          gap-1 entre suas 4 barras internas — assim as barras DO MESMO
+          MÊS ficam juntinhas mas meses diferentes ficam visivelmente
+          separados. */}
+      <div className="flex items-end gap-5 sm:gap-6 h-56 overflow-x-auto col-scroll pb-2 pt-6 px-1">
+        {filtered.map((b) => {
           const hR = (b.reunioesRealizadas / max) * 100;
           const hG = (b.ganhos / max) * 100;
           const hP = (b.perdidos / max) * 100;
+          const hC = (b.congelados / max) * 100;
           return (
             <div
               key={b.month}
-              className="flex-1 min-w-[56px] flex flex-col items-stretch h-full"
+              className="flex-1 min-w-[68px] flex flex-col items-stretch h-full"
               title={`${formatMonthLabel(b.month)} — Reuniões: ${b.reunioesRealizadas} | Ganhos: ${b.ganhos} | Perdidos: ${b.perdidos} | Congelados: ${b.congelados}`}
             >
-              <div className="flex-1 flex items-end gap-0.5">
+              <div className="flex-1 flex items-end gap-1">
                 <div
                   className="flex-1 bg-sky-500/80 rounded-t-sm relative"
                   style={{
@@ -624,9 +782,7 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
                 </div>
                 <div
                   className="flex-1 bg-emerald-500/80 rounded-t-sm relative"
-                  style={{
-                    height: `${Math.max(hG, b.ganhos > 0 ? 2 : 0)}%`,
-                  }}
+                  style={{ height: `${Math.max(hG, b.ganhos > 0 ? 2 : 0)}%` }}
                 >
                   {b.ganhos > 0 && (
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-emerald-300 font-medium">
@@ -636,13 +792,23 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
                 </div>
                 <div
                   className="flex-1 bg-rose-500/80 rounded-t-sm relative"
-                  style={{
-                    height: `${Math.max(hP, b.perdidos > 0 ? 2 : 0)}%`,
-                  }}
+                  style={{ height: `${Math.max(hP, b.perdidos > 0 ? 2 : 0)}%` }}
                 >
                   {b.perdidos > 0 && (
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-rose-300 font-medium">
                       {b.perdidos}
+                    </div>
+                  )}
+                </div>
+                <div
+                  className="flex-1 bg-amber-500/80 rounded-t-sm relative"
+                  style={{
+                    height: `${Math.max(hC, b.congelados > 0 ? 2 : 0)}%`,
+                  }}
+                >
+                  {b.congelados > 0 && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-amber-300 font-medium">
+                      {b.congelados}
                     </div>
                   )}
                 </div>
@@ -721,19 +887,19 @@ function BarChart({ byMonth }: { byMonth: MonthBucket[] }) {
         </div>
       </div>
 
-      {/* overflow-x-auto pra muitos meses; pt-6 dá espaço pros valores
-          acima das barras não cortarem com o topo do container. */}
-      <div className="flex items-end gap-1.5 sm:gap-2 h-56 overflow-x-auto col-scroll pb-2 pt-6">
+      {/* gap maior entre meses pra não grudar. pb-0 + label com mt-1
+          remove o espaço branco que tinha aqui embaixo. */}
+      <div className="flex items-end gap-4 sm:gap-5 h-48 overflow-x-auto col-scroll pb-0 pt-6 px-1">
         {byMonth.map((b) => {
           const hR = (b.recurring / max) * 100;
           const hP = (b.pontual / max) * 100;
           return (
             <div
               key={b.month}
-              className="flex-1 min-w-[44px] flex flex-col items-stretch h-full"
+              className="flex-1 min-w-[56px] flex flex-col items-stretch h-full"
               title={`${formatMonthLabel(b.month)} — R: ${formatBRL(b.recurring)} | P: ${formatBRL(b.pontual)} | ${b.count} venda(s)`}
             >
-              <div className="flex-1 flex items-end gap-0.5 sm:gap-1">
+              <div className="flex-1 flex items-end gap-1">
                 {/* Barra R (sky). Valor sempre visível em cima — sem
                     depender de hover (resolve bug de o tooltip ficar
                     fora da área visível pra barras altas como o MAI). */}
