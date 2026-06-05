@@ -399,40 +399,173 @@ function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
   }
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
-        <SummaryCard
+      {/* Linha 1: counters absolutos */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3">
+        <InfoCard
           label="Reuniões realizadas"
           value={String(s.reunioesRealizadas)}
           accent="sky"
+          tooltipTitle="Reuniões realizadas no período"
+          tooltipBody={
+            <>
+              Total de negócios <strong>criados</strong> no intervalo
+              selecionado (DATE_CREATE). Todo deal começa na etapa
+              "Reunião realizada", então isso equivale a quantas reuniões
+              voce realizou no período.
+            </>
+          }
         />
-        <SummaryCard
+        <InfoCard
           label="Ganhos"
           value={String(s.ganhos)}
           accent="emerald"
+          tooltipTitle="Negócios ganhos"
+          tooltipBody={
+            <>
+              Deals na etapa <strong>Negócio Ganho</strong> (WON) com
+              data de fechamento (CLOSEDATE) no período.
+            </>
+          }
         />
-        <SummaryCard
+        <InfoCard
           label="Perdidos"
           value={String(s.perdidos)}
           accent="rose"
+          tooltipTitle="Negócios perdidos"
+          tooltipBody={
+            <>
+              Deals na etapa <strong>Negócio Perdido</strong> (APOLOGY)
+              com data de fechamento no período.
+            </>
+          }
         />
-        <SummaryCard
+        <InfoCard
           label="Congelados"
           value={String(s.congelados)}
           accent="amber"
+          tooltipTitle="Negócios congelados"
+          tooltipBody={
+            <>
+              Deals na etapa <strong>Congelado</strong> (LOSE) com data
+              de fechamento no período. Não entram no cálculo da Taxa
+              de fechamento porque ainda podem voltar.
+            </>
+          }
         />
-        <SummaryCard
+      </div>
+
+      {/* Linha 2: as duas taxas — mesma proeminência. O padrão da
+          galera (ganhos/reuniões) vem primeiro pra ser o que bate o
+          olho. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-4">
+        <InfoCard
           label="Taxa de conversão"
+          value={pct(s.taxaConversaoTotal)}
+          accent="white"
+          tooltipTitle="Taxa de conversão (padrão de vendas)"
+          tooltipBody={
+            <>
+              <code className="text-emerald-300">
+                ganhos / reuniões realizadas
+              </code>
+              <br />
+              = {s.ganhos} / {s.reunioesRealizadas} ={" "}
+              <strong>{pct(s.taxaConversaoTotal)}</strong>
+              <br />
+              <br />
+              É a métrica que time comercial costuma trackear: de cada
+              100 reuniões que voce fez, quantas viraram venda. Conta os
+              negócios ainda no pipeline e os congelados como "não-ganhos"
+              pra ser conservadora.
+            </>
+          }
+        />
+        <InfoCard
+          label="Eficiência de fechamento"
           value={pct(s.taxaConversao)}
           accent="white"
+          tooltipTitle="Eficiência de fechamento"
+          tooltipBody={
+            <>
+              <code className="text-emerald-300">
+                ganhos / (ganhos + perdidos)
+              </code>
+              <br />
+              = {s.ganhos} / ({s.ganhos} + {s.perdidos}) ={" "}
+              <strong>{pct(s.taxaConversao)}</strong>
+              <br />
+              <br />
+              Olha só pros deals que já foram <strong>decididos</strong> —
+              ou ganhou ou explicitamente perdeu. Ignora os que ainda tão
+              no pipeline e os congelados. Útil pra avaliar sua habilidade
+              de fechamento <em>nos casos em que voce levou até o final</em>.
+            </>
+          }
         />
       </div>
-      <div className="text-[11px] text-white/40 mb-3">
-        Taxa de conversão = ganhos / (ganhos + perdidos). Conservadora pelo
-        total das reuniões: <strong>{pct(s.taxaConversaoTotal)}</strong>
-        {" "}(ganhos / reuniões realizadas).
-      </div>
+
       <ConversionChart byMonth={conversion.byMonth} />
     </>
+  );
+}
+
+// Card com tooltip on-hover. Usei "group" do Tailwind pra não precisar
+// de lib extra. O tooltip aparece acima do card, alinhado à esquerda,
+// e some quando o mouse sai. Em mobile (sem hover) o usuário pode
+// "tap-and-hold" no card pra disparar :hover na maioria dos browsers.
+function InfoCard({
+  label,
+  value,
+  accent,
+  tooltipTitle,
+  tooltipBody,
+}: {
+  label: string;
+  value: string;
+  accent: "sky" | "emerald" | "white" | "amber" | "rose";
+  tooltipTitle: string;
+  tooltipBody: React.ReactNode;
+}) {
+  const accentColors: Record<string, string> = {
+    sky: "text-sky-400",
+    emerald: "text-emerald-400",
+    white: "text-white",
+    amber: "text-amber-400",
+    rose: "text-rose-400",
+  };
+  return (
+    <div className="bg-white/[0.04] border border-white/10 rounded-lg p-3 relative group cursor-help">
+      <div className="flex items-center gap-1.5">
+        <div className="text-[10px] sm:text-[11px] text-white/50 uppercase tracking-wide font-medium">
+          {label}
+        </div>
+        <svg
+          className="w-3 h-3 text-white/30 group-hover:text-white/60 transition"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          aria-hidden
+        >
+          <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM7.5 7v4h1V7h-1zm.5-2.25a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5z" />
+        </svg>
+      </div>
+      <div
+        className={`mt-1 text-base sm:text-lg font-semibold ${accentColors[accent]}`}
+      >
+        {value}
+      </div>
+
+      {/* Tooltip on hover. Posicionado em cima do card; em telas estreitas
+          fica abaixo via sm:bottom-full → bottom-auto top-full não é fácil
+          de detectar; deixamos sempre acima e ajustamos com max-width. */}
+      <div
+        className="pointer-events-none absolute z-20 left-0 right-0 sm:right-auto sm:left-0 sm:w-72 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition shadow-xl"
+      >
+        <div className="bg-slate-900 border border-white/20 text-white rounded-lg p-3 text-[12px] leading-relaxed">
+          <div className="font-semibold mb-1 text-white">{tooltipTitle}</div>
+          <div className="text-white/80">{tooltipBody}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 
