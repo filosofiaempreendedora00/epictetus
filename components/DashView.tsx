@@ -41,6 +41,27 @@ type SalesResponse = {
   deals: DealOut[];
 };
 
+// Tipos pro /api/bitrix/conversion
+type ConvMonthBucket = {
+  month: string;
+  reunioesRealizadas: number;
+  ganhos: number;
+  perdidos: number;
+  congelados: number;
+};
+type ConversionResponse = {
+  range: { from: string; to: string };
+  summary: {
+    reunioesRealizadas: number;
+    ganhos: number;
+    perdidos: number;
+    congelados: number;
+    taxaConversao: number;
+    taxaConversaoTotal: number;
+  };
+  byMonth: ConvMonthBucket[];
+};
+
 const PT_MONTH_SHORT = [
   "jan", "fev", "mar", "abr", "mai", "jun",
   "jul", "ago", "set", "out", "nov", "dez",
@@ -68,15 +89,17 @@ export default function DashView() {
   );
 
   const [data, setData] = useState<SalesResponse | null>(null);
+  const [conversion, setConversion] = useState<ConversionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Decide o range que vai pra API:
+  // Decide o range que vai pra API. A mesma query string serve pros 2
+  // endpoints (sales + conversion).
   //   1) ?de=&ate= se ambos presentes (range custom)
   //   2) ?mes=YYYY-MM → mês específico (start..end do mês)
   //   3) /dash/<ano> → ano calendário inteiro
   //   4) default → últimos 12 meses (API decide)
-  const apiUrl = useMemo(() => {
+  const queryString = useMemo(() => {
     const params = new URLSearchParams();
     if (route.dashDe && route.dashAte) {
       params.set("from", route.dashDe);
@@ -93,9 +116,15 @@ export default function DashView() {
       params.set("from", `${route.dashAno}-01-01`);
       params.set("to", `${route.dashAno}-12-31`);
     }
-    const qs = params.toString();
-    return qs ? `/api/bitrix/sales?${qs}` : "/api/bitrix/sales";
+    return params.toString();
   }, [route.dashAno, route.dashMes, route.dashDe, route.dashAte]);
+
+  const salesUrl = queryString
+    ? `/api/bitrix/sales?${queryString}`
+    : "/api/bitrix/sales";
+  const conversionUrl = queryString
+    ? `/api/bitrix/conversion?${queryString}`
+    : "/api/bitrix/conversion";
 
   useEffect(() => {
     let cancelled = false;
@@ -103,11 +132,23 @@ export default function DashView() {
     setError(null);
     (async () => {
       try {
-        const res = await fetch(apiUrl, { cache: "no-store" });
-        const d = await res.json();
+        const [salesRes, convRes] = await Promise.all([
+          fetch(salesUrl, { cache: "no-store" }),
+          fetch(conversionUrl, { cache: "no-store" }),
+        ]);
+        const salesJson = await salesRes.json();
+        const convJson = await convRes.json();
         if (cancelled) return;
-        if (!res.ok) setError(d?.error || "Erro ao carregar vendas");
-        else setData(d as SalesResponse);
+        if (!salesRes.ok) {
+          setError(salesJson?.error || "Erro ao carregar vendas");
+          return;
+        }
+        if (!convRes.ok) {
+          setError(convJson?.error || "Erro ao carregar conversão");
+          return;
+        }
+        setData(salesJson as SalesResponse);
+        setConversion(convJson as ConversionResponse);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Erro de rede");
       } finally {
@@ -117,7 +158,7 @@ export default function DashView() {
     return () => {
       cancelled = true;
     };
-  }, [apiUrl]);
+  }, [salesUrl, conversionUrl]);
 
   // Estado do filtro custom (UI local — só vira URL ao clicar "Aplicar")
   const [customDe, setCustomDe] = useState(route.dashDe);
@@ -335,8 +376,151 @@ export default function DashView() {
             <BarChart byMonth={data.byMonth} />
             <DealsList deals={data.deals} />
           </div>
+
+          {/* Performance de conversão (v1 — depois dá pra aprofundar) */}
+          {conversion && (
+            <div className="mt-6">
+              <h2 className="text-white/80 text-sm font-medium mb-3">
+                Performance de conversão
+              </h2>
+              <ConversionSection conversion={conversion} />
+            </div>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
+  const s = conversion.summary;
+  function pct(v: number): string {
+    return `${(v * 100).toFixed(1).replace(".", ",")}%`;
+  }
+  return (
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
+        <SummaryCard
+          label="Reuniões realizadas"
+          value={String(s.reunioesRealizadas)}
+          accent="sky"
+        />
+        <SummaryCard
+          label="Ganhos"
+          value={String(s.ganhos)}
+          accent="emerald"
+        />
+        <SummaryCard
+          label="Perdidos"
+          value={String(s.perdidos)}
+          accent="rose"
+        />
+        <SummaryCard
+          label="Congelados"
+          value={String(s.congelados)}
+          accent="amber"
+        />
+        <SummaryCard
+          label="Taxa de conversão"
+          value={pct(s.taxaConversao)}
+          accent="white"
+        />
+      </div>
+      <div className="text-[11px] text-white/40 mb-3">
+        Taxa de conversão = ganhos / (ganhos + perdidos). Conservadora pelo
+        total das reuniões: <strong>{pct(s.taxaConversaoTotal)}</strong>
+        {" "}(ganhos / reuniões realizadas).
+      </div>
+      <ConversionChart byMonth={conversion.byMonth} />
+    </>
+  );
+}
+
+function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
+  // Normaliza pelo pico entre as 3 séries
+  const max = useMemo(() => {
+    let m = 0;
+    for (const b of byMonth) {
+      m = Math.max(m, b.reunioesRealizadas, b.ganhos, b.perdidos);
+    }
+    return m || 1;
+  }, [byMonth]);
+
+  return (
+    <div className="bg-white/[0.02] border border-white/10 rounded-lg p-3 sm:p-4">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h3 className="text-white/80 text-sm font-medium">
+          Reuniões vs Ganhos vs Perdidos (mês a mês)
+        </h3>
+        <div className="flex items-center gap-3 text-[11px] text-white/60 flex-wrap">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" /> Reuniões
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Ganhos
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-rose-500" /> Perdidos
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-end gap-2 h-56 overflow-x-auto col-scroll pb-2 pt-6">
+        {byMonth.map((b) => {
+          const hR = (b.reunioesRealizadas / max) * 100;
+          const hG = (b.ganhos / max) * 100;
+          const hP = (b.perdidos / max) * 100;
+          return (
+            <div
+              key={b.month}
+              className="flex-1 min-w-[56px] flex flex-col items-stretch h-full"
+              title={`${formatMonthLabel(b.month)} — Reuniões: ${b.reunioesRealizadas} | Ganhos: ${b.ganhos} | Perdidos: ${b.perdidos} | Congelados: ${b.congelados}`}
+            >
+              <div className="flex-1 flex items-end gap-0.5">
+                <div
+                  className="flex-1 bg-sky-500/80 rounded-t-sm relative"
+                  style={{
+                    height: `${Math.max(hR, b.reunioesRealizadas > 0 ? 2 : 0)}%`,
+                  }}
+                >
+                  {b.reunioesRealizadas > 0 && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-sky-300 font-medium">
+                      {b.reunioesRealizadas}
+                    </div>
+                  )}
+                </div>
+                <div
+                  className="flex-1 bg-emerald-500/80 rounded-t-sm relative"
+                  style={{
+                    height: `${Math.max(hG, b.ganhos > 0 ? 2 : 0)}%`,
+                  }}
+                >
+                  {b.ganhos > 0 && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-emerald-300 font-medium">
+                      {b.ganhos}
+                    </div>
+                  )}
+                </div>
+                <div
+                  className="flex-1 bg-rose-500/80 rounded-t-sm relative"
+                  style={{
+                    height: `${Math.max(hP, b.perdidos > 0 ? 2 : 0)}%`,
+                  }}
+                >
+                  {b.perdidos > 0 && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-rose-300 font-medium">
+                      {b.perdidos}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="text-center text-[10px] text-white/50 mt-1 truncate">
+                {formatMonthLabel(b.month)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -348,13 +532,14 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  accent: "sky" | "emerald" | "white" | "amber";
+  accent: "sky" | "emerald" | "white" | "amber" | "rose";
 }) {
   const accentColors: Record<string, string> = {
     sky: "text-sky-400",
     emerald: "text-emerald-400",
     white: "text-white",
     amber: "text-amber-400",
+    rose: "text-rose-400",
   };
   return (
     <div className="bg-white/[0.04] border border-white/10 rounded-lg p-3">
