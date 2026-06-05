@@ -399,7 +399,10 @@ export default function DashView() {
               horizontal). */}
           {conversion && (
             <div className="mt-3">
-              <ConversionChart byMonth={conversion.byMonth} />
+              <ConversionChart
+                byMonth={conversion.byMonth}
+                deals={conversion.deals}
+              />
             </div>
           )}
         </>
@@ -839,7 +842,32 @@ function InfoCard({
   );
 }
 
-function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
+// Filtra um array de deals por mês (date no formato DD/MM/YYYY) → bate
+// com o key YYYY-MM do bucket do chart.
+function filterDealsByMonth(
+  deals: ConvDealRef[],
+  monthKey: string
+): ConvDealRef[] {
+  const [yy, mm] = monthKey.split("-");
+  return deals.filter((d) => {
+    const parts = d.date.split("/");
+    if (parts.length !== 3) return false;
+    return parts[1] === mm && parts[2] === yy;
+  });
+}
+
+const PT_MONTH_LONG_DASH = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
+
+function ConversionChart({
+  byMonth,
+  deals,
+}: {
+  byMonth: ConvMonthBucket[];
+  deals?: ConversionResponse["deals"];
+}) {
   // Recorte: só meses a partir de 2026-04 (deals anteriores estavam num
   // pipeline diferente / pré-padronização — Roberto pediu pra cortar).
   const filtered = useMemo(
@@ -860,6 +888,23 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
     }
     return m || 1;
   }, [filtered]);
+
+  // Drill local — clicar numa barra abre um modal só com os deals
+  // daquela categoria + daquele mês.
+  const [drill, setDrill] = useState<{
+    key: DrillKey;
+    month: string;
+  } | null>(null);
+
+  function openDrill(key: DrillKey, month: string) {
+    if (!deals) return;
+    setDrill({ key, month });
+  }
+  function drillTitle(key: DrillKey, monthKey: string): string {
+    const [yy, mm] = monthKey.split("-");
+    const monthName = PT_MONTH_LONG_DASH[parseInt(mm, 10) - 1] || mm;
+    return `${DRILL_LABELS[key]} — ${monthName}/${yy}`;
+  }
 
   if (filtered.length === 0) {
     return (
@@ -907,51 +952,46 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
               className="flex-1 min-w-[68px] flex flex-col items-stretch h-full"
               title={`${formatMonthLabel(b.month)} — Reuniões: ${b.reunioesRealizadas} | Ganhos: ${b.ganhos} | Perdidos: ${b.perdidos} | Congelados: ${b.congelados}`}
             >
+              {/* Cada barra é um <button> — clicar abre o drill da
+                  categoria + mês específico. Barras com count > 0
+                  ficam clicáveis; barras de zero são display-only. */}
               <div className="flex-1 flex items-end gap-1">
-                <div
-                  className="flex-1 bg-amber-500/80 rounded-t-sm relative"
-                  style={{
-                    height: `${Math.max(hR, b.reunioesRealizadas > 0 ? 2 : 0)}%`,
-                  }}
-                >
-                  {b.reunioesRealizadas > 0 && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-amber-300 font-medium">
-                      {b.reunioesRealizadas}
-                    </div>
-                  )}
-                </div>
-                <div
-                  className="flex-1 bg-emerald-500/80 rounded-t-sm relative"
-                  style={{ height: `${Math.max(hG, b.ganhos > 0 ? 2 : 0)}%` }}
-                >
-                  {b.ganhos > 0 && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-emerald-300 font-medium">
-                      {b.ganhos}
-                    </div>
-                  )}
-                </div>
-                <div
-                  className="flex-1 bg-rose-500/80 rounded-t-sm relative"
-                  style={{ height: `${Math.max(hP, b.perdidos > 0 ? 2 : 0)}%` }}
-                >
-                  {b.perdidos > 0 && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-rose-300 font-medium">
-                      {b.perdidos}
-                    </div>
-                  )}
-                </div>
-                <div
-                  className="flex-1 bg-sky-500/80 rounded-t-sm relative"
-                  style={{
-                    height: `${Math.max(hC, b.congelados > 0 ? 2 : 0)}%`,
-                  }}
-                >
-                  {b.congelados > 0 && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-sky-300 font-medium">
-                      {b.congelados}
-                    </div>
-                  )}
-                </div>
+                <BarButton
+                  height={Math.max(hR, b.reunioesRealizadas > 0 ? 2 : 0)}
+                  count={b.reunioesRealizadas}
+                  barClass="bg-amber-500/80 hover:bg-amber-500"
+                  textClass="text-amber-300"
+                  label={`Reuniões em ${formatMonthLabel(b.month)}`}
+                  onClick={() => openDrill("reunioes", b.month)}
+                  disabled={!deals || b.reunioesRealizadas === 0}
+                />
+                <BarButton
+                  height={Math.max(hG, b.ganhos > 0 ? 2 : 0)}
+                  count={b.ganhos}
+                  barClass="bg-emerald-500/80 hover:bg-emerald-500"
+                  textClass="text-emerald-300"
+                  label={`Ganhos em ${formatMonthLabel(b.month)}`}
+                  onClick={() => openDrill("ganhos", b.month)}
+                  disabled={!deals || b.ganhos === 0}
+                />
+                <BarButton
+                  height={Math.max(hP, b.perdidos > 0 ? 2 : 0)}
+                  count={b.perdidos}
+                  barClass="bg-rose-500/80 hover:bg-rose-500"
+                  textClass="text-rose-300"
+                  label={`Perdidos em ${formatMonthLabel(b.month)}`}
+                  onClick={() => openDrill("perdidos", b.month)}
+                  disabled={!deals || b.perdidos === 0}
+                />
+                <BarButton
+                  height={Math.max(hC, b.congelados > 0 ? 2 : 0)}
+                  count={b.congelados}
+                  barClass="bg-sky-500/80 hover:bg-sky-500"
+                  textClass="text-sky-300"
+                  label={`Congelados em ${formatMonthLabel(b.month)}`}
+                  onClick={() => openDrill("congelados", b.month)}
+                  disabled={!deals || b.congelados === 0}
+                />
               </div>
               <div className="text-center text-[10px] text-white/50 mt-1 truncate">
                 {formatMonthLabel(b.month)}
@@ -960,7 +1000,59 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
           );
         })}
       </div>
+
+      {drill && deals && (
+        <DrillModal
+          title={drillTitle(drill.key, drill.month)}
+          deals={filterDealsByMonth(deals[drill.key], drill.month)}
+          onClose={() => setDrill(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// Botão de barra clicável usado no ConversionChart. Quando count > 0
+// e tem drill habilitado, hover destaca. Senão é só display.
+function BarButton({
+  height,
+  count,
+  barClass,
+  textClass,
+  label,
+  onClick,
+  disabled,
+}: {
+  height: number;
+  count: number;
+  barClass: string;
+  textClass: string;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className={`flex-1 rounded-t-sm relative transition ${barClass} ${
+        disabled
+          ? "cursor-default"
+          : "cursor-pointer hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-white/40"
+      }`}
+      style={{ height: `${height}%` }}
+    >
+      {count > 0 && (
+        <div
+          className={`absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] ${textClass} font-medium pointer-events-none`}
+        >
+          {count}
+        </div>
+      )}
+    </button>
   );
 }
 
