@@ -379,8 +379,10 @@ export default function DashView() {
 
           {/* Layout 3-col em desktop: gráfico de vendas | lista de
               vendas | cards de performance — cada um ocupando 1/3.
-              Em telas <lg empilha vertical. */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:items-stretch">
+              Altura fixa em desktop (lg:h-[380px]) — só a lista do meio
+              tem scroll interno, os outros 2 ficam fixos. Em <lg empilha
+              vertical e cada container tem altura livre. */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:h-[380px]">
             <BarChart byMonth={data.byMonth} />
             <DealsList deals={data.deals} />
             {conversion ? (
