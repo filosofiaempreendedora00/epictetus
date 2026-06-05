@@ -377,20 +377,27 @@ export default function DashView() {
             />
           </div>
 
-          {/* Chart (esquerda, ~2/3) + Lista de deals (direita, ~1/3).
-              Em telas <lg empilha verticalmente, chart em cima. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-3">
+          {/* Layout 3-col em desktop: gráfico de vendas | lista de
+              vendas | cards de performance — cada um ocupando 1/3.
+              Em telas <lg empilha vertical. */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:items-stretch">
             <BarChart byMonth={data.byMonth} />
             <DealsList deals={data.deals} />
+            {conversion ? (
+              <ConversionCardsBlock conversion={conversion} />
+            ) : (
+              <div className="bg-white/[0.02] border border-white/10 rounded-lg p-4 text-white/40 text-sm">
+                Carregando performance…
+              </div>
+            )}
           </div>
 
-          {/* Performance de conversão (v1 — depois dá pra aprofundar) */}
+          {/* Gráfico de barras de Reuniões vs Ganhos vs Perdidos vs Congelados
+              fica embaixo em largura total (chart se beneficia do
+              horizontal). */}
           {conversion && (
-            <div className="mt-6">
-              <h2 className="text-white/80 text-sm font-medium mb-3">
-                Performance de conversão
-              </h2>
-              <ConversionSection conversion={conversion} />
+            <div className="mt-3">
+              <ConversionChart byMonth={conversion.byMonth} />
             </div>
           )}
         </>
@@ -407,6 +414,137 @@ const DRILL_LABELS: Record<DrillKey, string> = {
   congelados: "Negócios congelados",
 };
 
+// Container 1/3 que reúne os 6 cards de Performance de Conversão.
+// Visualmente espelha o tamanho/aparência do BarChart e do DealsList
+// no layout 3-col em desktop.
+function ConversionCardsBlock({
+  conversion,
+}: {
+  conversion: ConversionResponse;
+}) {
+  const s = conversion.summary;
+  const [drill, setDrill] = useState<DrillKey | null>(null);
+  function pct(v: number): string {
+    return `${(v * 100).toFixed(1).replace(".", ",")}%`;
+  }
+  return (
+    <>
+      <div className="bg-white/[0.02] border border-white/10 rounded-lg p-3 sm:p-4 flex flex-col lg:h-full">
+        <h3 className="text-white text-sm font-medium mb-3 shrink-0">
+          Performance de conversão
+        </h3>
+        {/* 2 cols × 3 rows = 6 cards. Os 4 absolutos primeiro, depois as
+            2 taxas (Taxa de conversão é o padrão de vendas — vem primeiro). */}
+        <div className="grid grid-cols-2 gap-2 flex-1 content-start">
+          <InfoCard
+            label="Reuniões realizadas"
+            value={String(s.reunioesRealizadas)}
+            accent="amber"
+            onClick={() => setDrill("reunioes")}
+            tooltipTitle="Reuniões realizadas no período"
+            tooltipBody={
+              <>
+                Total de negócios <strong>criados</strong> no intervalo
+                selecionado (DATE_CREATE). Todo deal começa na etapa
+                "Reunião realizada". <em>Clique pra ver a lista.</em>
+              </>
+            }
+          />
+          <InfoCard
+            label="Ganhos"
+            value={String(s.ganhos)}
+            accent="emerald"
+            onClick={() => setDrill("ganhos")}
+            tooltipTitle="Negócios ganhos"
+            tooltipBody={
+              <>
+                Deals na etapa <strong>Negócio Ganho</strong> (WON) com
+                CLOSEDATE no período. <em>Clique pra ver a lista.</em>
+              </>
+            }
+          />
+          <InfoCard
+            label="Perdidos"
+            value={String(s.perdidos)}
+            accent="rose"
+            onClick={() => setDrill("perdidos")}
+            tooltipTitle="Negócios perdidos"
+            tooltipBody={
+              <>
+                Deals na etapa <strong>Negócio Perdido</strong> (APOLOGY)
+                com CLOSEDATE no período. <em>Clique pra ver a lista.</em>
+              </>
+            }
+          />
+          <InfoCard
+            label="Congelados"
+            value={String(s.congelados)}
+            accent="sky"
+            onClick={() => setDrill("congelados")}
+            tooltipTitle="Negócios congelados"
+            tooltipBody={
+              <>
+                Deals na etapa <strong>Congelado</strong> (LOSE) com
+                CLOSEDATE no período. Não entram no cálculo da Taxa de
+                fechamento. <em>Clique pra ver a lista.</em>
+              </>
+            }
+          />
+          <InfoCard
+            label="Taxa de conversão"
+            value={pct(s.taxaConversaoTotal)}
+            accent="white"
+            tooltipTitle="Taxa de conversão (padrão de vendas)"
+            tooltipBody={
+              <>
+                <code className="text-emerald-300">
+                  ganhos / reuniões realizadas
+                </code>
+                <br />
+                = {s.ganhos} / {s.reunioesRealizadas} ={" "}
+                <strong>{pct(s.taxaConversaoTotal)}</strong>
+                <br />
+                <br />
+                Métrica padrão: de cada 100 reuniões, quantas viraram
+                venda. Inclui pipeline em-aberto e congelados como
+                "não-ganhos".
+              </>
+            }
+          />
+          <InfoCard
+            label="Eficiência de fechamento"
+            value={pct(s.taxaConversao)}
+            accent="white"
+            tooltipTitle="Eficiência de fechamento"
+            tooltipBody={
+              <>
+                <code className="text-emerald-300">
+                  ganhos / (ganhos + perdidos)
+                </code>
+                <br />
+                = {s.ganhos} / ({s.ganhos} + {s.perdidos}) ={" "}
+                <strong>{pct(s.taxaConversao)}</strong>
+                <br />
+                <br />
+                Olha só pros deals <strong>decididos</strong>. Ignora
+                pipeline em-aberto e congelados.
+              </>
+            }
+          />
+        </div>
+      </div>
+
+      {drill && (
+        <DrillModal
+          title={DRILL_LABELS[drill]}
+          deals={conversion.deals[drill]}
+          onClose={() => setDrill(null)}
+        />
+      )}
+    </>
+  );
+}
+
 function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
   const s = conversion.summary;
   const [drill, setDrill] = useState<DrillKey | null>(null);
@@ -420,7 +558,7 @@ function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
         <InfoCard
           label="Reuniões realizadas"
           value={String(s.reunioesRealizadas)}
-          accent="sky"
+          accent="amber"
           onClick={() => setDrill("reunioes")}
           tooltipTitle="Reuniões realizadas no período"
           tooltipBody={
@@ -463,7 +601,7 @@ function ConversionSection({ conversion }: { conversion: ConversionResponse }) {
         <InfoCard
           label="Congelados"
           value={String(s.congelados)}
-          accent="amber"
+          accent="sky"
           onClick={() => setDrill("congelados")}
           tooltipTitle="Negócios congelados"
           tooltipBody={
@@ -700,10 +838,10 @@ function InfoCard({
 }
 
 function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
-  // Recorte: só meses a partir de 2026-01 (deals anteriores estavam num
+  // Recorte: só meses a partir de 2026-04 (deals anteriores estavam num
   // pipeline diferente / pré-padronização — Roberto pediu pra cortar).
   const filtered = useMemo(
-    () => byMonth.filter((b) => b.month >= "2026-01"),
+    () => byMonth.filter((b) => b.month >= "2026-04"),
     [byMonth]
   );
   // Normaliza pelo pico entre as 4 séries
@@ -724,7 +862,7 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
   if (filtered.length === 0) {
     return (
       <div className="bg-white/[0.02] border border-white/10 rounded-lg p-4 text-center text-white/40 text-sm">
-        Sem dados de 2026 em diante para esse período.
+        Sem dados de abril/2026 em diante para esse período.
       </div>
     );
   }
@@ -733,11 +871,11 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
     <div className="bg-white/[0.02] border border-white/10 rounded-lg p-3 sm:p-4">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 className="text-white/80 text-sm font-medium">
-          Reuniões vs Ganhos vs Perdidos vs Congelados (mês a mês, 2026+)
+          Reuniões vs Ganhos vs Perdidos vs Congelados (mês a mês, abr/2026+)
         </h3>
         <div className="flex items-center gap-3 text-[11px] text-white/60 flex-wrap">
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" /> Reuniões
+            <span className="w-2.5 h-2.5 rounded-sm bg-amber-500" /> Reuniões
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Ganhos
@@ -746,7 +884,7 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
             <span className="w-2.5 h-2.5 rounded-sm bg-rose-500" /> Perdidos
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-amber-500" /> Congelados
+            <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" /> Congelados
           </span>
         </div>
       </div>
@@ -769,13 +907,13 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
             >
               <div className="flex-1 flex items-end gap-1">
                 <div
-                  className="flex-1 bg-sky-500/80 rounded-t-sm relative"
+                  className="flex-1 bg-amber-500/80 rounded-t-sm relative"
                   style={{
                     height: `${Math.max(hR, b.reunioesRealizadas > 0 ? 2 : 0)}%`,
                   }}
                 >
                   {b.reunioesRealizadas > 0 && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-sky-300 font-medium">
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-amber-300 font-medium">
                       {b.reunioesRealizadas}
                     </div>
                   )}
@@ -801,13 +939,13 @@ function ConversionChart({ byMonth }: { byMonth: ConvMonthBucket[] }) {
                   )}
                 </div>
                 <div
-                  className="flex-1 bg-amber-500/80 rounded-t-sm relative"
+                  className="flex-1 bg-sky-500/80 rounded-t-sm relative"
                   style={{
                     height: `${Math.max(hC, b.congelados > 0 ? 2 : 0)}%`,
                   }}
                 >
                   {b.congelados > 0 && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-amber-300 font-medium">
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-sky-300 font-medium">
                       {b.congelados}
                     </div>
                   )}
@@ -855,14 +993,20 @@ function SummaryCard({
 }
 
 function BarChart({ byMonth }: { byMonth: MonthBucket[] }) {
+  // Recorte: só meses a partir de abril/2026 (alinhado ao chart de
+  // conversão — mesma decisão de Roberto).
+  const filtered = useMemo(
+    () => byMonth.filter((b) => b.month >= "2026-04"),
+    [byMonth]
+  );
   // Pega o pico geral pra normalizar as alturas.
   const max = useMemo(() => {
     let m = 0;
-    for (const b of byMonth) {
+    for (const b of filtered) {
       m = Math.max(m, b.recurring, b.pontual);
     }
     return m || 1;
-  }, [byMonth]);
+  }, [filtered]);
 
   // Formatador compacto pros valores que ficam acima das barras
   // (R$ 28.997 → "29K", R$ 1.500.000 → "1,5M"). Mantém o eixo X limpo
@@ -874,9 +1018,11 @@ function BarChart({ byMonth }: { byMonth: MonthBucket[] }) {
   }
 
   return (
-    <div className="bg-white/[0.02] border border-white/10 rounded-lg p-3 sm:p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-white/80 text-sm font-medium">Vendas mês a mês</h3>
+    <div className="bg-white/[0.02] border border-white/10 rounded-lg p-3 sm:p-4 flex flex-col lg:h-full">
+      <div className="flex items-center justify-between mb-3 shrink-0 flex-wrap gap-2">
+        <h3 className="text-white text-sm font-medium">
+          Vendas mês a mês <span className="text-white/40">(abr/2026+)</span>
+        </h3>
         <div className="flex items-center gap-3 text-[11px] text-white/60">
           <span className="inline-flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" /> Valor R
@@ -887,10 +1033,16 @@ function BarChart({ byMonth }: { byMonth: MonthBucket[] }) {
         </div>
       </div>
 
-      {/* gap maior entre meses pra não grudar. pb-0 + label com mt-1
-          remove o espaço branco que tinha aqui embaixo. */}
-      <div className="flex items-end gap-4 sm:gap-5 h-48 overflow-x-auto col-scroll pb-0 pt-6 px-1">
-        {byMonth.map((b) => {
+      {filtered.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-white/40 text-sm">
+          Sem dados de abril/2026 em diante para esse período.
+        </div>
+      ) : (
+      /* gap maior entre meses pra não grudar. flex-1 ocupa altura total
+         do container; sem padding inferior — label do mês já tem mt-1
+         suficiente. */
+      <div className="flex items-end gap-4 sm:gap-5 flex-1 overflow-x-auto col-scroll pb-0 pt-6 px-1">
+        {filtered.map((b) => {
           const hR = (b.recurring / max) * 100;
           const hP = (b.pontual / max) * 100;
           return (
@@ -931,6 +1083,7 @@ function BarChart({ byMonth }: { byMonth: MonthBucket[] }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
@@ -944,8 +1097,8 @@ function DealsList({ deals }: { deals: DealOut[] }) {
     );
   }
   return (
-    <div className="bg-white/[0.02] border border-white/10 rounded-lg overflow-hidden flex flex-col lg:max-h-[400px]">
-      <div className="px-3 sm:px-4 py-2.5 border-b border-white/10 text-white/80 text-sm font-medium shrink-0">
+    <div className="bg-white/[0.02] border border-white/10 rounded-lg overflow-hidden flex flex-col lg:h-full">
+      <div className="px-4 py-3 border-b border-white/10 text-white text-sm font-medium shrink-0">
         {deals.length} venda{deals.length === 1 ? "" : "s"} no período
       </div>
       <div className="divide-y divide-white/5 overflow-y-auto col-scroll flex-1">
@@ -957,19 +1110,19 @@ function DealsList({ deals }: { deals: DealOut[] }) {
           return (
             <div
               key={d.id}
-              className="px-3 sm:px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.02] transition"
+              className="px-4 py-3 flex items-center gap-3 hover:bg-white/[0.02] transition"
             >
               <div className="flex-1 min-w-0">
-                <div className="text-white text-[12px] truncate font-medium">
+                <div className="text-white text-[14px] truncate font-medium">
                   {d.title}
                 </div>
-                <div className="text-white/40 text-[10px]">{dtLabel}</div>
+                <div className="text-white/50 text-[12px] mt-0.5">{dtLabel}</div>
               </div>
               <div className="shrink-0 text-right">
-                <div className="text-[10px] text-sky-400">
+                <div className="text-[12px] text-sky-400 font-medium">
                   R {formatBRL(d.recurring)}
                 </div>
-                <div className="text-[10px] text-emerald-400">
+                <div className="text-[12px] text-emerald-400 font-medium">
                   P {formatBRL(d.pontual)}
                 </div>
               </div>
