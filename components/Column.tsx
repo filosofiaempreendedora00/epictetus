@@ -3,12 +3,16 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { Column as ColumnType, Card as CardType } from "@/lib/types";
+import { formatBRL } from "@/lib/initialData";
 import Card from "./Card";
 
 type Props = {
   column: ColumnType;
   cards: CardType[];
-  totalLabel: string;
+  // Totais somados da coluna, separados por tipo. Convenção do app:
+  // Valor R = sky, Valor P = emerald (mesma cor usada em outras telas).
+  totalRecurring: number;
+  totalPontual: number;
   isFirst?: boolean;
   onAddCard: () => void;
   onDeleteCard: (cardId: string) => void;
@@ -25,7 +29,8 @@ type Props = {
 export default function Column({
   column,
   cards,
-  totalLabel,
+  totalRecurring,
+  totalPontual,
   isFirst,
   onAddCard,
   onDeleteCard,
@@ -72,9 +77,28 @@ export default function Column({
         </button>
       </div>
 
-      {/* Total */}
-      <div className="bg-white/[0.03] border-x border-white/5 px-4 py-2 text-center text-white/60 text-sm">
-        {totalLabel}
+      {/* Totais por tipo — Valor R (recorrente, sky) e Valor P (pontual,
+          emerald) lado a lado. Antes era um número flat só, que misturava
+          os dois tipos e escondia o que realmente importa pra leitura
+          rápida do funil. */}
+      <div className="bg-white/[0.03] border-x border-white/5 px-3 py-2 flex items-center justify-around gap-2 text-[11px]">
+        <div className="flex flex-col items-center leading-tight min-w-0">
+          <span className="text-white/40 uppercase tracking-wide text-[9px]">
+            Valor R
+          </span>
+          <span className="text-sky-400 font-medium tabular-nums truncate">
+            {formatBRL(totalRecurring)}
+          </span>
+        </div>
+        <div className="w-px h-7 bg-white/10" />
+        <div className="flex flex-col items-center leading-tight min-w-0">
+          <span className="text-white/40 uppercase tracking-wide text-[9px]">
+            Valor P
+          </span>
+          <span className="text-emerald-400 font-medium tabular-nums truncate">
+            {formatBRL(totalPontual)}
+          </span>
+        </div>
       </div>
 
       {/* Droppable area */}

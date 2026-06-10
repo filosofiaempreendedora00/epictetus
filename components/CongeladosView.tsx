@@ -69,12 +69,16 @@ export default function CongeladosView() {
     });
   }
 
-  function columnTotal(colCardIds: string[]) {
-    return colCardIds.reduce((sum, id) => {
+  function columnTotals(colCardIds: string[]) {
+    let recurring = 0;
+    let pontual = 0;
+    for (const id of colCardIds) {
       const c = state.cards[id];
-      if (!c) return sum;
-      return sum + (c.value || 0) + (c.pontual || 0) + (c.recurring || 0);
-    }, 0);
+      if (!c) continue;
+      recurring += c.recurring || 0;
+      pontual += (c.pontual || 0) + (c.value || 0);
+    }
+    return { recurring, pontual };
   }
 
   // Stats agregadas pro topo (todos os deals em LOSE)
@@ -166,12 +170,14 @@ export default function CongeladosView() {
           // Esconde colunas vazias depois do filtro (não polui visual);
           // sem filtro mostramos todas, inclusive vazias, pra dar visão geral
           if (searchTerm && visibleIds.length === 0) return null;
+          const totals = columnTotals(visibleIds);
           return (
             <Column
               key={col.id}
               column={{ ...col, cardIds: visibleIds }}
               cards={visibleIds.map((id) => state.cards[id]).filter(Boolean)}
-              totalLabel={formatBRL(columnTotal(visibleIds))}
+              totalRecurring={totals.recurring}
+              totalPontual={totals.pontual}
               isFirst={idx === 0}
               onAddCard={() => {
                 /* sem ação — Congelados não cria deal direto */

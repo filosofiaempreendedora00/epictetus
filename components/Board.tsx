@@ -14,7 +14,6 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { BoardState, Card as CardType } from "@/lib/types";
-import { formatBRL } from "@/lib/initialData";
 import Column from "./Column";
 import Card from "./Card";
 import Header from "./Header";
@@ -843,12 +842,19 @@ export default function Board() {
     }
   }
 
-  function columnTotal(colCardIds: string[]) {
-    return colCardIds.reduce((sum, id) => {
+  function columnTotals(colCardIds: string[]) {
+    let recurring = 0;
+    let pontual = 0;
+    for (const id of colCardIds) {
       const c = state.cards[id];
-      if (!c) return sum;
-      return sum + (c.value || 0) + (c.pontual || 0) + (c.recurring || 0);
-    }, 0);
+      if (!c) continue;
+      recurring += c.recurring || 0;
+      // c.value é o valor "padrão" do Bitrix — quando existir, ele
+      // pode duplicar com pontual. Mantemos o comportamento antigo
+      // somando ambos só pra não regredir a leitura do header.
+      pontual += (c.pontual || 0) + (c.value || 0);
+    }
+    return { recurring, pontual };
   }
 
   function filterCardIds(ids: string[]): string[] {
@@ -903,12 +909,14 @@ export default function Board() {
           <div className="flex gap-3 sm:gap-4 overflow-x-auto px-3 sm:px-6 pb-6 col-scroll snap-x-cards sm:snap-none">
             {state.columns.map((col, idx) => {
               const visibleIds = filterCardIds(col.cardIds);
+              const totals = columnTotals(visibleIds);
               return (
                 <Column
                   key={col.id}
                   column={{ ...col, cardIds: visibleIds }}
                   cards={visibleIds.map((id) => state.cards[id]).filter(Boolean)}
-                  totalLabel={formatBRL(columnTotal(visibleIds))}
+                  totalRecurring={totals.recurring}
+                  totalPontual={totals.pontual}
                   isFirst={idx === 0}
                   onAddCard={() => handleAddCard(col.id)}
                   onDeleteCard={handleDeleteCard}
