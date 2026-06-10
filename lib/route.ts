@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { TaskType } from "./taskTypes";
 
@@ -278,18 +278,33 @@ export function useRoute() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Memoizado pelo conteúdo serializado, não pela identidade do
+  // ReadonlyURLSearchParams. Em Next.js production o objeto retornado
+  // por useSearchParams() pode mudar de identidade entre renders mesmo
+  // quando a query string é idêntica — sem essa proteção, `route` virava
+  // um objeto novo a cada render e contaminava qualquer consumer que
+  // dependesse de sua identidade.
+  const sp = searchParams.toString();
   const route = useMemo(
-    () => parseRoute(pathname, new URLSearchParams(searchParams.toString())),
-    [pathname, searchParams]
+    () => parseRoute(pathname, new URLSearchParams(sp)),
+    [pathname, sp]
   );
 
-  const setRoute = useCallback(
-    (patch: Partial<AppRoute>) => {
-      const next: AppRoute = { ...route, ...patch };
-      router.replace(buildRoute(next), { scroll: false });
-    },
-    [route, router]
-  );
+  // `setRoute` precisa ler `route` atual, mas se a função em si for
+  // recriada a cada render qualquer consumer que (acidentalmente) a
+  // coloque em deps array entra em loop. Mantemos a função estável via
+  // ref e lemos a referência mais recente dentro dela. Isso impede o
+  // "Maximum update depth exceeded" que aparecia só em produção
+  // (em dev StrictMode ajudava a estabilizar).
+  const routeRef = useRef(route);
+  routeRef.current = route;
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
+  const setRoute = useCallback((patch: Partial<AppRoute>) => {
+    const next: AppRoute = { ...routeRef.current, ...patch };
+    routerRef.current.replace(buildRoute(next), { scroll: false });
+  }, []);
 
   return { route, setRoute };
 }
