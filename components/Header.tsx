@@ -83,6 +83,19 @@ export default function Header({
       </div>
 
       <div className="mt-3 inline-flex items-center gap-1 bg-white/[0.04] border border-white/10 rounded-lg p-1">
+        {/* Dashboard vem antes em mobile (aparece só aqui — no desktop
+            o desktop usa a Sidebar). Roberto quis Dashboard como
+            primeira aba pra abrir o dia já vendo as métricas. */}
+        <button
+          onClick={() => onViewModeChange("dash")}
+          className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
+            viewMode === "dash"
+              ? "bg-white/15 text-white font-medium shadow-sm"
+              : "text-white/55 hover:text-white/85"
+          }`}
+        >
+          Dashboard
+        </button>
         <button
           onClick={() => onViewModeChange("negocios")}
           className={`px-3 sm:px-3 py-2 sm:py-1 text-[13px] rounded-md transition ${
@@ -113,8 +126,7 @@ export default function Header({
         >
           Reuniões
         </button>
-        {/* Dashboard e Congelados ficam na sidebar no desktop; em mobile
-            aparecem aqui (md:hidden) pra ainda serem acessíveis sem sidebar. */}
+        {/* Congelados continua depois — só em mobile. */}
         <button
           onClick={() => onViewModeChange("congelados")}
           className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
@@ -124,16 +136,6 @@ export default function Header({
           }`}
         >
           ❄️ Congelados
-        </button>
-        <button
-          onClick={() => onViewModeChange("dash")}
-          className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
-            viewMode === "dash"
-              ? "bg-white/15 text-white font-medium shadow-sm"
-              : "text-white/55 hover:text-white/85"
-          }`}
-        >
-          Dashboard
         </button>
       </div>
     </header>

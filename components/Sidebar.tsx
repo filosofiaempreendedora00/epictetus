@@ -16,6 +16,14 @@ type Item = {
 
 const items: Item[] = [
   {
+    key: "dash",
+    label: "Dashboard",
+    icon: "📊",
+    available: true,
+    matches: (v) => v === "dash",
+    navigateTo: "dash",
+  },
+  {
     key: "kanban",
     label: "Kanban",
     icon: "▦",
@@ -31,14 +39,6 @@ const items: Item[] = [
     available: true,
     matches: (v) => v === "congelados",
     navigateTo: "congelados",
-  },
-  {
-    key: "dash",
-    label: "Dashboard",
-    icon: "📊",
-    available: true,
-    matches: (v) => v === "dash",
-    navigateTo: "dash",
   },
   {
     key: "scripts",
