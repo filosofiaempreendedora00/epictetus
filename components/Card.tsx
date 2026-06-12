@@ -24,7 +24,7 @@ type Props = {
   ) => Promise<void>;
   onCompleteTask?: (cardId: string, taskId: string) => Promise<void>;
   onUpdateProposalLink?: (cardId: string, link: string) => Promise<void>;
-  allStages?: Array<{ stageId: string; title: string }>;
+  allStages?: Array<{ stageId: string; title: string; color?: string }>;
   currentStageId?: string;
   onChangeStage?: (cardId: string, newStageId: string) => Promise<void>;
   // Abrir o modal "Editar negócio" agora é responsabilidade do parent

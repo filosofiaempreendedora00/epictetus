@@ -927,7 +927,11 @@ export default function Board() {
                   onUpdateProposalLink={handleUpdateProposalLink}
                   allStages={state.columns
                     .filter((c) => c.stageId)
-                    .map((c) => ({ stageId: c.stageId!, title: c.title }))}
+                    .map((c) => ({
+                      stageId: c.stageId!,
+                      title: c.title,
+                      color: c.color,
+                    }))}
                   onChangeStage={handleChangeStage}
                   onOpenDealEdit={(name) =>
                     setRoute(openEditarNegocio(name))
@@ -1142,7 +1146,11 @@ export default function Board() {
         const currentCol = state.columns.find((c) => c.id === currentColId);
         const allStages = state.columns
           .filter((c) => c.stageId)
-          .map((c) => ({ stageId: c.stageId!, title: c.title }));
+          .map((c) => ({
+            stageId: c.stageId!,
+            title: c.title,
+            color: c.color,
+          }));
         return (
           <DealEditModal
             cardTitle={card.title}
