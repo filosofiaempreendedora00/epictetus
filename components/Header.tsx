@@ -116,16 +116,6 @@ export default function Header({
         {/* Dashboard e Congelados ficam na sidebar no desktop; em mobile
             aparecem aqui (md:hidden) pra ainda serem acessíveis sem sidebar. */}
         <button
-          onClick={() => onViewModeChange("dash")}
-          className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
-            viewMode === "dash"
-              ? "bg-white/15 text-white font-medium shadow-sm"
-              : "text-white/55 hover:text-white/85"
-          }`}
-        >
-          Dashboard
-        </button>
-        <button
           onClick={() => onViewModeChange("congelados")}
           className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
             viewMode === "congelados"
@@ -134,6 +124,16 @@ export default function Header({
           }`}
         >
           ❄️ Congelados
+        </button>
+        <button
+          onClick={() => onViewModeChange("dash")}
+          className={`md:hidden px-3 py-2 text-[13px] rounded-md transition ${
+            viewMode === "dash"
+              ? "bg-white/15 text-white font-medium shadow-sm"
+              : "text-white/55 hover:text-white/85"
+          }`}
+        >
+          Dashboard
         </button>
       </div>
     </header>

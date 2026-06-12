@@ -25,20 +25,20 @@ const items: Item[] = [
     navigateTo: "negocios",
   },
   {
-    key: "dash",
-    label: "Dashboard",
-    icon: "📊",
-    available: true,
-    matches: (v) => v === "dash",
-    navigateTo: "dash",
-  },
-  {
     key: "congelados",
     label: "Pipeline de Congelados",
     icon: "❄️",
     available: true,
     matches: (v) => v === "congelados",
     navigateTo: "congelados",
+  },
+  {
+    key: "dash",
+    label: "Dashboard",
+    icon: "📊",
+    available: true,
+    matches: (v) => v === "dash",
+    navigateTo: "dash",
   },
   {
     key: "scripts",
