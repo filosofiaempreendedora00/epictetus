@@ -9,8 +9,15 @@ export const dynamic = "force-dynamic";
 //
 // Para um intervalo (default últimos 12 meses), devolve:
 //   summary:
-//     reunioesRealizadas  = deals criados (DATE_CREATE) no período
-//                           — todo deal começa em NEW = "Reunião realizada"
+//     reunioesRealizadas  = deals do Roberto que entraram na coluna NEW
+//                           ("Reunião realizada") no período — via
+//                           crm.stagehistory.list. Conta deals únicos
+//                           (se um mesmo deal entrou em NEW 2x no mês,
+//                           continua valendo 1).
+//                           Antes era por DATE_CREATE, mas isso ignorava
+//                           leads antigos que tiveram reunião nova no mês
+//                           (deal de mai/26 com reunião em jun/26 era
+//                           invisível pra métrica — Roberto pegou isso).
 //     ganhos              = deals atualmente em WON e fechados no período
 //     perdidos            = deals em APOLOGY ("Negócio perdido") fechados no período
 //     congelados          = deals em LOSE ("Congelado") fechados no período
@@ -18,9 +25,8 @@ export const dynamic = "force-dynamic";
 //                           — excluí "congelados" porque podem reabrir
 //     taxaConversaoTotal  = ganhos / reunioesRealizadas (mais conservador)
 //   byMonth: [{ month, reunioesRealizadas, ganhos, perdidos, congelados }]
-//
-// Bem-vindo aprofundar depois — esse é o v1.
 
+const NEW_STAGE = "NEW";        // "Reunião realizada" — denominador
 const WON_STAGE = "WON";
 const LOSE_STAGE = "LOSE";
 const APOLOGY_STAGE = "APOLOGY";
@@ -31,6 +37,15 @@ type RawDeal = {
   STAGE_ID?: string;
   DATE_CREATE?: string;
   CLOSEDATE?: string;
+  ASSIGNED_BY_ID?: string;
+};
+
+// crm.stagehistory.list (entityTypeId=2) — registro de transição de stage
+type RawStageEntry = {
+  ID: number;
+  OWNER_ID: number;
+  STAGE_ID: string;
+  CREATED_TIME: string;
 };
 
 function brShort(iso: string | undefined): string {
@@ -82,21 +97,31 @@ export async function GET(req: Request) {
       );
     }
 
-    // 4 queries em paralelo: criados (por DATE_CREATE) + 3 stages finais (por CLOSEDATE).
-    // O semáforo de lib/bitrix.ts já limita concorrência total a 2.
+    // 3 queries de fechamento em paralelo (won/lost/frozen) + 1 separada
+    // pra stage history das entradas em NEW. A 5ª (deals por ID, pra cruzar
+    // com Roberto) só pode rodar depois que a stage history voltar.
     const baseAssign = { ASSIGNED_BY_ID: responsibleId };
     const fromIso = from.toISOString();
     const toIso = to.toISOString();
 
-    const [created, won, lost, frozen] = await Promise.all([
-      bitrixListAll<RawDeal>("crm.deal.list", {
-        filter: {
-          ...baseAssign,
-          ">=DATE_CREATE": fromIso,
-          "<=DATE_CREATE": toIso,
+    const [stageEntries, won, lost, frozen] = await Promise.all([
+      // Todas as transições pra NEW no período (qualquer responsável).
+      // Não dá pra filtrar por ASSIGNED_BY_ID aqui — esse campo é do deal,
+      // não da entrada de stage history. Cruzamos depois.
+      bitrixListAll<RawStageEntry>(
+        "crm.stagehistory.list",
+        {
+          entityTypeId: 2, // deal
+          filter: {
+            STAGE_ID: NEW_STAGE,
+            ">=CREATED_TIME": fromIso,
+            "<=CREATED_TIME": toIso,
+          },
+          select: ["ID", "OWNER_ID", "STAGE_ID", "CREATED_TIME"],
+          order: { CREATED_TIME: "ASC" },
         },
-        select: ["ID", "TITLE", "STAGE_ID", "DATE_CREATE"],
-      }),
+        { itemsField: "items" }
+      ),
       bitrixListAll<RawDeal>("crm.deal.list", {
         filter: {
           ...baseAssign,
@@ -126,6 +151,50 @@ export async function GET(req: Request) {
       }),
     ]);
 
+    // Resolve quem é o ASSIGNED_BY_ID de cada deal que entrou em NEW e
+    // filtra só os do Roberto. Como o universo pode ser grande (~150
+    // transições/mês), fatiamos em batches de 50 IDs por crm.deal.list.
+    const uniqueOwnerIds = [
+      ...new Set(stageEntries.map((e) => String(e.OWNER_ID))),
+    ];
+    const dealsById = new Map<string, RawDeal>();
+    const CHUNK = 50;
+    for (let i = 0; i < uniqueOwnerIds.length; i += CHUNK) {
+      const ids = uniqueOwnerIds.slice(i, i + CHUNK);
+      const batch = await bitrixListAll<RawDeal>("crm.deal.list", {
+        filter: { ID: ids },
+        select: ["ID", "TITLE", "STAGE_ID", "ASSIGNED_BY_ID", "DATE_CREATE"],
+      });
+      for (const d of batch) dealsById.set(String(d.ID), d);
+    }
+
+    // Cada entrada em NEW + dados do deal → mantém só do Roberto e dedupa
+    // por OWNER_ID (1 deal = 1 reunião, mesmo se entrou em NEW 2x).
+    const robertoReunioesSet = new Map<
+      string,
+      { id: string; title: string; createdTime: string }
+    >();
+    for (const entry of stageEntries) {
+      const ownerId = String(entry.OWNER_ID);
+      const deal = dealsById.get(ownerId);
+      if (!deal) continue;
+      if (deal.ASSIGNED_BY_ID !== responsibleId) continue;
+      const existing = robertoReunioesSet.get(ownerId);
+      // Guarda a 1ª entrada cronologicamente (já vem em ASC pelo order
+      // acima, mas double-check).
+      if (
+        !existing ||
+        (entry.CREATED_TIME || "") < (existing.createdTime || "")
+      ) {
+        robertoReunioesSet.set(ownerId, {
+          id: ownerId,
+          title: deal.TITLE || "(sem título)",
+          createdTime: entry.CREATED_TIME,
+        });
+      }
+    }
+    const reunioes = [...robertoReunioesSet.values()];
+
     type Bucket = {
       month: string;
       reunioesRealizadas: number;
@@ -149,8 +218,8 @@ export async function GET(req: Request) {
       return b;
     }
 
-    for (const d of created) {
-      const dt = d.DATE_CREATE ? new Date(d.DATE_CREATE) : null;
+    for (const r of reunioes) {
+      const dt = r.createdTime ? new Date(r.createdTime) : null;
       if (!dt || isNaN(dt.getTime())) continue;
       ensure(monthKey(dt)).reunioesRealizadas++;
     }
@@ -188,7 +257,7 @@ export async function GET(req: Request) {
       cursor.setMonth(cursor.getMonth() + 1);
     }
 
-    const reunioesRealizadas = created.length;
+    const reunioesRealizadas = reunioes.length;
     const ganhos = won.length;
     const perdidos = lost.length;
     const congelados = frozen.length;
@@ -213,6 +282,17 @@ export async function GET(req: Request) {
         .map(({ id, title, date }) => ({ id, title, date }));
     }
 
+    // Reuniões têm shape diferente (data = entrada em NEW, não DATE_CREATE).
+    const packedReunioes = reunioes
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        date: brShort(r.createdTime),
+        rawDate: r.createdTime,
+      }))
+      .sort((a, b) => b.rawDate.localeCompare(a.rawDate))
+      .map(({ id, title, date }) => ({ id, title, date }));
+
     return NextResponse.json({
       range: { from: from.toISOString(), to: to.toISOString() },
       summary: {
@@ -225,7 +305,7 @@ export async function GET(req: Request) {
       },
       byMonth: filled,
       deals: {
-        reunioes: pack(created, "DATE_CREATE"),
+        reunioes: packedReunioes,
         ganhos: pack(won, "CLOSEDATE"),
         perdidos: pack(lost, "CLOSEDATE"),
         congelados: pack(frozen, "CLOSEDATE"),

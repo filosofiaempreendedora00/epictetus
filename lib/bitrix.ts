@@ -235,7 +235,12 @@ export async function bitrix<T = any>(
 
 export async function bitrixListAll<T = any>(
   method: string,
-  params: Record<string, any> = {}
+  params: Record<string, any> = {},
+  // Métodos novos do Bitrix (crm.stagehistory.list, crm.timeline.bindings.list,
+  // etc.) embrulham o array em result.items em vez de retornar result direto.
+  // Quando esse for o caso, passa { itemsField: "items" } pra esse helper
+  // saber de onde tirar o chunk.
+  opts: { itemsField?: string } = {}
 ): Promise<T[]> {
   if (!BASE) throw new Error("BITRIX_WEBHOOK_URL não está configurado em .env.local");
   const out: T[] = [];
@@ -257,7 +262,9 @@ export async function bitrixListAll<T = any>(
       }
       await sleep(delays[attempt]);
     }
-    const chunk = (json.result as T[]) || [];
+    const chunk = (opts.itemsField
+      ? (json.result?.[opts.itemsField] as T[])
+      : (json.result as T[])) || [];
     out.push(...chunk);
     if (json.next === undefined || json.next === null) break;
     start = json.next;
