@@ -3,6 +3,13 @@ import { bitrixListAll } from "@/lib/bitrix";
 
 export const dynamic = "force-dynamic";
 
+// Cache simples em memória pra resposta inteira — primeiro hit paga
+// ~15s, hits subsequentes (mesmo range) voltam em <50ms. Range é a
+// chave. TTL curto pra refletir mudanças no Bitrix em poucos minutos.
+type CacheEntry = { value: any; expiresAt: number };
+const responseCache = new Map<string, CacheEntry>();
+const RESPONSE_TTL_MS = 5 * 60 * 1000;
+
 // =============================================================================
 // /api/bitrix/conversion — métricas de performance/conversão do Roberto
 // =============================================================================
@@ -90,6 +97,16 @@ export async function GET(req: Request) {
       to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     }
 
+    // Cache hit por range — reaproveita até 5min. As métricas raramente
+    // mudam a cada segundo e o endpoint custa ~15s pra 12 meses.
+    const cacheK = `${responsibleId}::${from.toISOString()}::${to.toISOString()}`;
+    const hit = responseCache.get(cacheK);
+    if (hit && hit.expiresAt > Date.now()) {
+      return NextResponse.json(hit.value, {
+        headers: { "X-Cache": "HIT" },
+      });
+    }
+
     if (isNaN(from.getTime()) || isNaN(to.getTime())) {
       return NextResponse.json(
         { error: "from/to inválidos (use YYYY-MM-DD)" },
@@ -97,17 +114,18 @@ export async function GET(req: Request) {
       );
     }
 
-    // 3 queries de fechamento em paralelo (won/lost/frozen) + 1 separada
-    // pra stage history das entradas em NEW. A 5ª (deals por ID, pra cruzar
-    // com Roberto) só pode rodar depois que a stage history voltar.
+    // 5 queries em paralelo:
+    //   1 — stage history das entradas em NEW no período (qualquer dono)
+    //   1 — TODOS os deals atualmente do Roberto (sem filtro de data)
+    //       — usamos como tabela hash em memória pra resolver ASSIGNED_BY_ID
+    //       das stage entries sem precisar de N batches de crm.deal.list.
+    //       Pra 12 meses isso reduz ~36 round-trips a 1.
+    //   3 — won/lost/frozen do Roberto fechados no período (por CLOSEDATE)
     const baseAssign = { ASSIGNED_BY_ID: responsibleId };
     const fromIso = from.toISOString();
     const toIso = to.toISOString();
 
-    const [stageEntries, won, lost, frozen] = await Promise.all([
-      // Todas as transições pra NEW no período (qualquer responsável).
-      // Não dá pra filtrar por ASSIGNED_BY_ID aqui — esse campo é do deal,
-      // não da entrada de stage history. Cruzamos depois.
+    const [stageEntries, robertoDeals, won, lost, frozen] = await Promise.all([
       bitrixListAll<RawStageEntry>(
         "crm.stagehistory.list",
         {
@@ -122,6 +140,10 @@ export async function GET(req: Request) {
         },
         { itemsField: "items" }
       ),
+      bitrixListAll<RawDeal>("crm.deal.list", {
+        filter: { ...baseAssign },
+        select: ["ID", "TITLE"],
+      }),
       bitrixListAll<RawDeal>("crm.deal.list", {
         filter: {
           ...baseAssign,
@@ -151,37 +173,22 @@ export async function GET(req: Request) {
       }),
     ]);
 
-    // Resolve quem é o ASSIGNED_BY_ID de cada deal que entrou em NEW e
-    // filtra só os do Roberto. Como o universo pode ser grande (~150
-    // transições/mês), fatiamos em batches de 50 IDs por crm.deal.list.
-    const uniqueOwnerIds = [
-      ...new Set(stageEntries.map((e) => String(e.OWNER_ID))),
-    ];
-    const dealsById = new Map<string, RawDeal>();
-    const CHUNK = 50;
-    for (let i = 0; i < uniqueOwnerIds.length; i += CHUNK) {
-      const ids = uniqueOwnerIds.slice(i, i + CHUNK);
-      const batch = await bitrixListAll<RawDeal>("crm.deal.list", {
-        filter: { ID: ids },
-        select: ["ID", "TITLE", "STAGE_ID", "ASSIGNED_BY_ID", "DATE_CREATE"],
-      });
-      for (const d of batch) dealsById.set(String(d.ID), d);
-    }
+    // Hash de deals do Roberto pra resolver title + filtrar stage entries.
+    const robertoDealsById = new Map<string, RawDeal>();
+    for (const d of robertoDeals) robertoDealsById.set(String(d.ID), d);
 
-    // Cada entrada em NEW + dados do deal → mantém só do Roberto e dedupa
-    // por OWNER_ID (1 deal = 1 reunião, mesmo se entrou em NEW 2x).
+    // Cada entrada em NEW que pertence a um deal do Roberto vira 1
+    // reunião. Dedupa por OWNER_ID (mesmo deal entrando em NEW 2x ainda
+    // vale 1). Guarda a 1ª data cronologicamente.
     const robertoReunioesSet = new Map<
       string,
       { id: string; title: string; createdTime: string }
     >();
     for (const entry of stageEntries) {
       const ownerId = String(entry.OWNER_ID);
-      const deal = dealsById.get(ownerId);
-      if (!deal) continue;
-      if (deal.ASSIGNED_BY_ID !== responsibleId) continue;
+      const deal = robertoDealsById.get(ownerId);
+      if (!deal) continue; // não é deal do Roberto
       const existing = robertoReunioesSet.get(ownerId);
-      // Guarda a 1ª entrada cronologicamente (já vem em ASC pelo order
-      // acima, mas double-check).
       if (
         !existing ||
         (entry.CREATED_TIME || "") < (existing.createdTime || "")
@@ -293,7 +300,7 @@ export async function GET(req: Request) {
       .sort((a, b) => b.rawDate.localeCompare(a.rawDate))
       .map(({ id, title, date }) => ({ id, title, date }));
 
-    return NextResponse.json({
+    const payload = {
       range: { from: from.toISOString(), to: to.toISOString() },
       summary: {
         reunioesRealizadas,
@@ -310,7 +317,12 @@ export async function GET(req: Request) {
         perdidos: pack(lost, "CLOSEDATE"),
         congelados: pack(frozen, "CLOSEDATE"),
       },
+    };
+    responseCache.set(cacheK, {
+      value: payload,
+      expiresAt: Date.now() + RESPONSE_TTL_MS,
     });
+    return NextResponse.json(payload, { headers: { "X-Cache": "MISS" } });
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message || "Erro ao calcular conversão" },

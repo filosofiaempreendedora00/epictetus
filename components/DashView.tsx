@@ -133,35 +133,52 @@ export default function DashView() {
     ? `/api/bitrix/conversion?${queryString}`
     : "/api/bitrix/conversion";
 
+  // Sales é fast (~3s) e conversion é slow (~17s pra 12 meses, por causa
+  // do crm.stagehistory.list). Disparamos os 2 em paralelo mas escondemos
+  // os spinners separados — sales libera o render do BarChart+DealsList
+  // assim que volta; conversion continua carregando seu próprio bloco até
+  // o fim. Antes o loading=true esperava AMBOS terminarem, então a tela
+  // ficava preta 17s.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    (async () => {
-      try {
-        const [salesRes, convRes] = await Promise.all([
-          fetch(salesUrl, { cache: "no-store" }),
-          fetch(conversionUrl, { cache: "no-store" }),
-        ]);
-        const salesJson = await salesRes.json();
-        const convJson = await convRes.json();
+    setData(null);
+    setConversion(null);
+
+    fetch(salesUrl, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
         if (cancelled) return;
-        if (!salesRes.ok) {
-          setError(salesJson?.error || "Erro ao carregar vendas");
-          return;
+        if (!r.ok) {
+          setError(j?.error || "Erro ao carregar vendas");
+        } else {
+          setData(j as SalesResponse);
         }
-        if (!convRes.ok) {
-          setError(convJson?.error || "Erro ao carregar conversão");
-          return;
-        }
-        setData(salesJson as SalesResponse);
-        setConversion(convJson as ConversionResponse);
-      } catch (e: any) {
+      })
+      .catch((e) => {
         if (!cancelled) setError(e?.message || "Erro de rede");
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false);
-      }
-    })();
+      });
+
+    fetch(conversionUrl, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        if (cancelled) return;
+        if (!r.ok) {
+          // Não trava o dashboard — só não mostra o bloco de conversão.
+          console.error("Erro ao carregar conversão:", j?.error);
+          return;
+        }
+        setConversion(j as ConversionResponse);
+      })
+      .catch((e) => {
+        // mesma ideia: silencioso, só logamos
+        console.error("Erro de rede conversion:", e);
+      });
+
     return () => {
       cancelled = true;
     };

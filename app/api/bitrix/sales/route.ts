@@ -7,6 +7,11 @@ const FIELD_VALOR_PONTUAL = "UF_CRM_1752256743002";
 const FIELD_VALOR_RECORRENTE = "UF_CRM_1752256871802";
 const WON_STAGE_ID = "WON";
 
+// Cache em memória curto pra evitar refetch em refreshes/navegação.
+type CacheEntry = { value: any; expiresAt: number };
+const responseCache = new Map<string, CacheEntry>();
+const RESPONSE_TTL_MS = 5 * 60 * 1000;
+
 type RawDeal = {
   ID: string;
   TITLE?: string;
@@ -77,6 +82,12 @@ export async function GET(req: Request) {
         { error: "from/to inválidos (use YYYY-MM-DD)" },
         { status: 400 }
       );
+    }
+
+    const cacheK = `${responsibleId}::${from.toISOString()}::${to.toISOString()}`;
+    const hit = responseCache.get(cacheK);
+    if (hit && hit.expiresAt > Date.now()) {
+      return NextResponse.json(hit.value, { headers: { "X-Cache": "HIT" } });
     }
 
     const deals = await bitrixListAll<RawDeal>("crm.deal.list", {
@@ -168,7 +179,7 @@ export async function GET(req: Request) {
       cursor.setMonth(cursor.getMonth() + 1);
     }
 
-    return NextResponse.json({
+    const payload = {
       range: { from: from.toISOString(), to: to.toISOString() },
       summary: {
         totalPontual: totalP,
@@ -178,7 +189,12 @@ export async function GET(req: Request) {
       },
       byMonth: monthsFilled,
       deals: dealsOut,
+    };
+    responseCache.set(cacheK, {
+      value: payload,
+      expiresAt: Date.now() + RESPONSE_TTL_MS,
     });
+    return NextResponse.json(payload, { headers: { "X-Cache": "MISS" } });
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message || "Erro ao carregar vendas" },
