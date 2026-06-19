@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { TaskType } from "./taskTypes";
 
@@ -278,32 +278,44 @@ export function useRoute() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Memoizado pelo conteúdo serializado, não pela identidade do
+  // Memoizado pelo CONTEÚDO da query, não pela identidade do
   // ReadonlyURLSearchParams. Em Next.js production o objeto retornado
-  // por useSearchParams() pode mudar de identidade entre renders mesmo
-  // quando a query string é idêntica — sem essa proteção, `route` virava
-  // um objeto novo a cada render e contaminava qualquer consumer que
-  // dependesse de sua identidade.
+  // por useSearchParams() muda de identidade entre renders mesmo com
+  // query igual — sem isso, `route` virava objeto novo a cada render.
   const sp = searchParams.toString();
   const route = useMemo(
     () => parseRoute(pathname, new URLSearchParams(sp)),
     [pathname, sp]
   );
 
-  // `setRoute` precisa ler `route` atual, mas se a função em si for
-  // recriada a cada render qualquer consumer que (acidentalmente) a
-  // coloque em deps array entra em loop. Mantemos a função estável via
-  // ref e lemos a referência mais recente dentro dela. Isso impede o
-  // "Maximum update depth exceeded" que aparecia só em produção
-  // (em dev StrictMode ajudava a estabilizar).
+  // setRoute precisa ser ESTÁVEL (mesma identidade entre renders) pra
+  // não entrar em loop em consumers que (acidentalmente) o coloquem em
+  // deps de useEffect — bug "Maximum update depth exceeded" que só
+  // aparecia em produção.
+  //
+  // Usamos refs pra route/router/sp, sincronizando via useEffect (NÃO
+  // durante render — React concorrente pode descartar renders e mutar
+  // ref no body do componente sai do sync). Em troca, setRoute lê o
+  // último valor commitado, que é exatamente o que queremos pra
+  // navegação.
   const routeRef = useRef(route);
-  routeRef.current = route;
   const routerRef = useRef(router);
-  routerRef.current = router;
+  const urlRef = useRef(`${pathname}${sp ? `?${sp}` : ""}`);
+  useEffect(() => {
+    routeRef.current = route;
+    routerRef.current = router;
+    urlRef.current = `${pathname}${sp ? `?${sp}` : ""}`;
+  }, [route, router, pathname, sp]);
 
   const setRoute = useCallback((patch: Partial<AppRoute>) => {
     const next: AppRoute = { ...routeRef.current, ...patch };
-    routerRef.current.replace(buildRoute(next), { scroll: false });
+    const nextUrl = buildRoute(next);
+    // Short-circuit: se o URL final é exatamente o atual, não chamar
+    // router.replace — em prod isso disparava um re-render Suspense
+    // adicional que, junto com outras cascatas, podia derrubar a tela
+    // no Render.
+    if (nextUrl === urlRef.current) return;
+    routerRef.current.replace(nextUrl, { scroll: false });
   }, []);
 
   return { route, setRoute };
